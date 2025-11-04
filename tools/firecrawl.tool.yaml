@@ -1,7 +1,0 @@
-name: firecrawl
-description: Scrapes a URL using the FireCrawl CLI and returns clean Markdown.
-type: cli
-command: "firecrawl scrape {{url}}"
-output_format: markdown
-env_vars:
-  - FIRECRAWL_API_KEY

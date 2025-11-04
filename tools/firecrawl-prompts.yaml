@@ -1,0 +1,4 @@
+default: ""
+# Example:
+# example.com: |
+#   Extract the full article body in Vietnamese without rewriting. Preserve headings and lists.
