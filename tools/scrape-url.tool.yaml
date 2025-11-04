@@ -1,0 +1,7 @@
+name: scrape-url
+description: Scrapes a URL to extract clean, raw Markdown content.
+type: cli
+command: "firecrawl scrape {{url}}" # This assumes firecrawl-cli is installed and configured
+output_format: markdown
+env_vars:
+  - FIRECRAWL_API_KEY # FireCrawl requires an API key
