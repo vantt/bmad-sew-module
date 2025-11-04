@@ -1,0 +1,45 @@
+<task id="bmad/sew/tasks/seo-optimization.task.xml" name="SEO Optimization">
+  <objective>Tối ưu hóa bản nháp bài viết cho SEO, bao gồm từ khóa, thẻ meta, và các yếu tố kỹ thuật khác, sử dụng agent SEOSpecialist.</objective>
+
+  <parameters>
+    <param name="first_draft" type="string" required="true">Bản nháp đầu tiên của bài viết cần tối ưu.</param>
+    <param name="topic" type="string" required="true">Chủ đề chính của bài viết.</param>
+    <param name="output_file" type="string" required="false">Đường dẫn file để lưu bản nháp đã tối ưu SEO (Markdown). Nếu không cung cấp, chỉ trả về kết quả trong bộ nhớ.</param>
+  </parameters>
+
+  <output>
+    <param name="seo_optimized_draft" type="string">Bản nháp bài viết đã được tối ưu SEO.</param>
+  </output>
+
+  <flow>
+    <step n="1" goal="Gọi agent SEOSpecialist để tối ưu SEO">
+      <action>
+        Gọi agent `SEOSpecialist` để thực hiện tối ưu hóa SEO cho bản nháp bài viết.
+      </action>
+      <invoke-task
+          exec="bmad/core/tasks/invoke-agent.xml"
+          agent_id="bmad/sew/agents/seo-specialist.agent.yaml"
+          command="*onpage-analysis --text '{{first_draft}}' --topic '{{topic}}'"
+          output_variable="seo_optimized_draft"
+      />
+    </step>
+
+    <step n="2" goal="Lưu bản nháp đã tối ưu vào file nếu output_file được cung cấp">
+      <check if="{{output_file}} is not empty">
+        <action>
+          Tạo thư mục cha của {{output_file}} nếu chưa tồn tại.
+        </action>
+        <action>
+          Ghi nội dung {{seo_optimized_draft}} vào file {{output_file}}.
+        </action>
+        <action>
+          Hiển thị: "✓ Saved: {{output_file}}"
+        </action>
+      </check>
+    </step>
+
+    <step n="3" goal="Trả về bản nháp đã tối ưu SEO">
+        <action>Trả về giá trị của biến `seo_optimized_draft`.</action>
+    </step>
+  </flow>
+</task>

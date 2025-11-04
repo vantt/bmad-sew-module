@@ -1,0 +1,59 @@
+<task id="bmad/sew/tasks/human-approval-gate.task.xml" name="Human Approval Gate">
+  <objective>Trình bày một tập hợp các ý tưởng đã được chọn lọc cho người dùng để nhận được sự phê duyệt hoặc phản hồi.</objective>
+
+  <parameters>
+    <param name="curated_ideas" type="string" required="true">Danh sách các ý tưởng đã được chọn lọc cần được phê duyệt.</param>
+    <param name="output_file" type="string" required="false">Đường dẫn file để lưu ý tưởng đã phê duyệt (YAML). Nếu không cung cấp, chỉ trả về kết quả trong bộ nhớ.</param>
+  </parameters>
+
+  <output>
+    <param name="decision" type="string">Quyết định của người dùng ('approved' hoặc 'rejected').</param>
+    <param name="feedback" type="string">Phản hồi của người dùng nếu bị từ chối.</param>
+    <param name="approved_ideas" type="string">Các ý tưởng đã được phê duyệt (nếu approved).</param>
+  </output>
+
+  <flow>
+    <step n="1" goal="Trình bày ý tưởng và yêu cầu phê duyệt">
+      <action>
+        Hiển thị các ý tưởng đã được chọn lọc cho người dùng.
+      </action>
+      <output>
+        <param name="curated_ideas" type="string">{{curated_ideas}}</param>
+      </output>
+      <ask>Chào {user_name}! Vui lòng xem xét các ý tưởng đã được chọn lọc ở trên. Bạn có muốn phê duyệt chúng, hay muốn cung cấp phản hồi để AI điều chỉnh lại? (phê duyệt/điều chỉnh)</ask>
+    </step>
+
+    <step n="2" goal="Xử lý quyết định của người dùng">
+      <check if="user_response == 'phê duyệt'">
+        <action>Ghi nhận quyết định phê duyệt.</action>
+        <action>Set {{approved_ideas}} = {{curated_ideas}}</action>
+        <output>
+          <param name="decision" type="string">approved</param>
+          <param name="approved_ideas" type="string">{{approved_ideas}}</param>
+        </output>
+      </check>
+      <check if="user_response == 'điều chỉnh'">
+        <action>Ghi nhận quyết định từ chối và yêu cầu phản hồi.</action>
+        <ask>Vui lòng cung cấp phản hồi của bạn để các agent có thể điều chỉnh lại:</ask>
+        <output>
+          <param name="decision" type="string">rejected</param>
+          <param name="feedback" type="string">{{user_response}}</param>
+        </output>
+      </check>
+    </step>
+
+    <step n="3" goal="Lưu ý tưởng đã phê duyệt vào file nếu được phê duyệt">
+      <check if="{{decision}} == 'approved' AND {{output_file}} is not empty">
+        <action>
+          Tạo thư mục cha của {{output_file}} nếu chưa tồn tại.
+        </action>
+        <action>
+          Ghi nội dung {{approved_ideas}} vào file {{output_file}}.
+        </action>
+        <action>
+          Hiển thị: "✓ Saved: {{output_file}}"
+        </action>
+      </check>
+    </step>
+  </flow>
+</task>

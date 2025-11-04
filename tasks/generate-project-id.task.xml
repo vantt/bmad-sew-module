@@ -1,0 +1,293 @@
+<task id="bmad/sew/tasks/generate-project-id.task.xml" name="Generate Project ID">
+  <objective>
+    Tạo unique project ID cho SEO article rewriting project.
+    Hỗ trợ: auto-generate từ URL/title hoặc custom ID do user cung cấp.
+  </objective>
+
+  <parameters>
+    <param name="source_url" type="string" required="false">
+      Source URL of the article. Used to extract domain/slug for ID.
+    </param>
+    <param name="title" type="string" required="false">
+      Article title. Used to create slug for ID.
+    </param>
+    <param name="custom_id" type="string" required="false">
+      Custom project ID provided by user. Must be alphanumeric with hyphens only.
+    </param>
+    <param name="sessions_folder" type="string" required="false">
+      Base sessions folder path. Default: {project-root}/bmad/sew/sessions
+      Used to check for duplicate IDs.
+    </param>
+  </parameters>
+
+  <output>
+    <param name="project_id" type="string">
+      Generated unique project ID
+    </param>
+    <param name="id_type" type="string">
+      Type of ID: "custom" | "auto-from-title" | "auto-from-url" | "auto-timestamp"
+    </param>
+    <param name="success" type="boolean">
+      Operation success status
+    </param>
+    <param name="message" type="string">
+      Result message
+    </param>
+    <param name="error" type="string">
+      Error message if failed
+    </param>
+  </output>
+
+  <flow>
+    <!-- Step 1: Set defaults -->
+    <step n="1" goal="Initialize and validate inputs">
+      <action>
+        Set {{sessions_folder}} = {{sessions_folder}} OR "{project-root}/bmad/sew/sessions"
+      </action>
+
+      <action>
+        Get current timestamp in format: YYYYMMDD-HHmmss
+        Example: 20251103-143022
+        Store as {{timestamp}}
+      </action>
+    </step>
+
+    <!-- Step 2: Determine ID generation strategy -->
+    <step n="2" goal="Determine how to generate ID">
+      <check if="{{custom_id}} is not empty">
+        <goto step="10">Use custom ID</goto>
+      </check>
+
+      <check if="{{title}} is not empty">
+        <goto step="20">Generate from title</goto>
+      </check>
+
+      <check if="{{source_url}} is not empty">
+        <goto step="30">Generate from URL</goto>
+      </check>
+
+      <goto step="40">Generate from timestamp only</goto>
+    </step>
+
+    <!-- Step 10-12: Custom ID -->
+    <step n="10" goal="Validate and use custom ID">
+      <action>
+        Validate {{custom_id}}:
+        - Must contain only: lowercase letters (a-z), numbers (0-9), hyphens (-)
+        - Cannot start or end with hyphen
+        - Length: 3-100 characters
+        - No consecutive hyphens (---)
+      </action>
+
+      <check if="validation failed">
+        <action>Set {{success}} = false</action>
+        <action>Set {{error}} = "Invalid custom ID format. Use only lowercase letters, numbers, and hyphens (3-100 chars)."</action>
+        <goto step="999">Exit with error</goto>
+      </check>
+
+      <action>
+        Normalize {{custom_id}}:
+        - Convert to lowercase
+        - Trim whitespace
+      </action>
+
+      <action>Set {{project_id}} = {{custom_id}}</action>
+      <action>Set {{id_type}} = "custom"</action>
+      <goto step="50">Check uniqueness</goto>
+    </step>
+
+    <!-- Step 20-21: Generate from title -->
+    <step n="20" goal="Generate ID from title">
+      <action>
+        Create slug from {{title}}:
+        1. Convert to lowercase
+        2. Remove Vietnamese accents:
+           - á à ả ã ạ ă ắ ằ ẳ ẵ ặ â ấ ầ ẩ ẫ ậ → a
+           - é è ẻ ẽ ẹ ê ế ề ể ễ ệ → e
+           - í ì ỉ ĩ ị → i
+           - ó ò ỏ õ ọ ô ố ồ ổ ỗ ộ ơ ớ ờ ở ỡ ợ → o
+           - ú ù ủ ũ ụ ư ứ ừ ử ữ ự → u
+           - ý ỳ ỷ ỹ ỵ → y
+           - đ → d
+        3. Replace spaces and special characters with hyphens
+        4. Remove consecutive hyphens
+        5. Remove leading/trailing hyphens
+        6. Truncate to max 50 characters
+        7. Store as {{slug}}
+      </action>
+
+      <action>
+        Set {{project_id}} = "seo-{{timestamp}}-{{slug}}"
+      </action>
+
+      <action>Set {{id_type}} = "auto-from-title"</action>
+      <goto step="50">Check uniqueness</goto>
+    </step>
+
+    <!-- Step 30-31: Generate from URL -->
+    <step n="30" goal="Generate ID from source URL">
+      <action>
+        Extract domain and path from {{source_url}}:
+        1. Parse URL to get domain (e.g., "example.com")
+        2. Extract path components
+        3. Take last meaningful path segment (e.g., "learn-english")
+      </action>
+
+      <action>
+        Create slug:
+        - If path segment exists and is meaningful → use it
+        - Otherwise use domain
+        - Apply same normalization as step 20
+        - Store as {{slug}}
+      </action>
+
+      <action>
+        Set {{project_id}} = "seo-{{timestamp}}-{{slug}}"
+      </action>
+
+      <action>Set {{id_type}} = "auto-from-url"</action>
+      <goto step="50">Check uniqueness</goto>
+    </step>
+
+    <!-- Step 40: Generate from timestamp only -->
+    <step n="40" goal="Generate ID from timestamp only">
+      <action>
+        Set {{project_id}} = "seo-{{timestamp}}"
+      </action>
+
+      <action>Set {{id_type}} = "auto-timestamp"</action>
+      <goto step="50">Check uniqueness</goto>
+    </step>
+
+    <!-- Step 50-52: Check uniqueness and handle duplicates -->
+    <step n="50" goal="Check if project ID already exists">
+      <action>
+        Set {{candidate_id}} = {{project_id}}
+      </action>
+
+      <action>
+        Set {{duplicate_counter}} = 0
+      </action>
+
+      <action>
+        Check if folder exists: {{sessions_folder}}/{{candidate_id}}
+      </action>
+    </step>
+
+    <step n="51" goal="Handle duplicate IDs">
+      <check if="folder exists">
+        <action>Increment {{duplicate_counter}}</action>
+
+        <check if="{{duplicate_counter}} > 100">
+          <action>Set {{success}} = false</action>
+          <action>Set {{error}} = "Could not generate unique ID after 100 attempts"</action>
+          <goto step="999">Exit with error</goto>
+        </check>
+
+        <action>
+          Set {{candidate_id}} = "{{project_id}}-{{duplicate_counter}}"
+        </action>
+
+        <action>
+          Check if folder exists: {{sessions_folder}}/{{candidate_id}}
+        </action>
+
+        <goto step="51">Retry until unique</goto>
+      </check>
+
+      <action>
+        Set {{project_id}} = {{candidate_id}}
+      </action>
+    </step>
+
+    <step n="52" goal="Finalize project ID">
+      <check if="{{duplicate_counter}} > 0">
+        <action>
+          Set {{message}} = "Generated unique project ID: {{project_id}} (original had {{duplicate_counter}} duplicates)"
+        </action>
+      </check>
+
+      <check if="else">
+        <action>
+          Set {{message}} = "Generated unique project ID: {{project_id}}"
+        </action>
+      </check>
+
+      <action>Set {{success}} = true</action>
+      <goto step="999">Exit success</goto>
+    </step>
+
+    <!-- Step 999: Return result -->
+    <step n="999" goal="Return project ID">
+      <action>
+        Return result:
+        {
+          project_id: {{project_id}},
+          id_type: {{id_type}},
+          success: {{success}},
+          message: {{message}},
+          error: {{error}} (if any)
+        }
+      </action>
+    </step>
+  </flow>
+
+  <examples>
+    <example>
+      <description>Generate from title (Vietnamese)</description>
+      <input>
+        title: "Cách Học Tiếng Anh Hiệu Quả Cho Người Bận Rộn"
+      </input>
+      <output>
+        project_id: "seo-20251103-143022-cach-hoc-tieng-anh-hieu-qua-cho-nguoi-ban-ron"
+        id_type: "auto-from-title"
+      </output>
+    </example>
+
+    <example>
+      <description>Generate from URL</description>
+      <input>
+        source_url: "https://example.com/blog/learn-english-effectively"
+      </input>
+      <output>
+        project_id: "seo-20251103-143022-learn-english-effectively"
+        id_type: "auto-from-url"
+      </output>
+    </example>
+
+    <example>
+      <description>Custom ID</description>
+      <input>
+        custom_id: "my-first-article"
+      </input>
+      <output>
+        project_id: "my-first-article"
+        id_type: "custom"
+      </output>
+    </example>
+
+    <example>
+      <description>Timestamp only (no title/URL)</description>
+      <input>
+        (no parameters)
+      </input>
+      <output>
+        project_id: "seo-20251103-143022"
+        id_type: "auto-timestamp"
+      </output>
+    </example>
+
+    <example>
+      <description>Handle duplicate</description>
+      <input>
+        title: "Marketing Tips"
+        (folder seo-20251103-143022-marketing-tips already exists)
+      </input>
+      <output>
+        project_id: "seo-20251103-143022-marketing-tips-1"
+        id_type: "auto-from-title"
+        message: "Generated unique project ID (original had 1 duplicates)"
+      </output>
+    </example>
+  </examples>
+</task>

@@ -1,0 +1,83 @@
+# BMAD™ Method SEW Module Configuration
+# SEW: SEO Expert Writer - AI-Powered Content Rewriting System
+
+code: sew
+name: "SEW: SEO Expert Writer - Hệ thống AI Viết Lại Nội dung SEO"
+default_selected: false # This module will not be selected by default for new installations
+
+prompt:
+  - "SEO Expert Writer - Hệ thống AI chuyên nghiệp để viết lại và tối ưu nội dung SEO"
+  - "Module này bao gồm các agents chuyên môn: Market Insight, Content Analyzer, Adaptive Writer, QA Editor, và nhiều hơn nữa."
+  - "Tất cả đường dẫn tương đối với project root, không có dấu / ở đầu."
+
+# Variables from Core Config được thừa kế:
+## user_name
+## communication_language
+## output_folder
+
+# SEW Module specific configuration
+sessions_output_folder:
+  prompt: "Thư mục lưu các file trạng thái (progress) của dự án?"
+  default: "bmad/sew/sessions"
+  result: "{project-root}/{value}"
+
+final_output_folder:
+  prompt: "Thư mục lưu các bài viết hoàn chỉnh (final output)?"
+  default: "output"
+  result: "{project-root}/{value}"
+
+# Target market configuration
+target_market:
+  prompt: "Thị trường mục tiêu của nội dung (ảnh hưởng đến SEO strategy)?"
+  default: "Vietnam"
+  result: "{value}"
+
+# Content quality settings
+content_quality_level:
+  prompt: "Mức độ chất lượng nội dung mong muốn?"
+  default: "high"
+  result: "{value}"
+  single-select:
+    - value: "standard"
+      label: "Standard - Nội dung cơ bản, tập trung vào SEO"
+    - value: "high"
+      label: "High - Cân bằng giữa SEO và chất lượng nội dung"
+    - value: "premium"
+      label: "Premium - Ưu tiên chất lượng, SEO tự nhiên"
+
+# SEO optimization level
+seo_optimization_level:
+  prompt: "Mức độ tối ưu SEO?"
+  default: "balanced"
+  result: "{value}"
+  single-select:
+    - value: "light"
+      label: "Light - SEO nhẹ, giữ tự nhiên"
+    - value: "balanced"
+      label: "Balanced - Cân bằng SEO và tự nhiên"
+    - value: "aggressive"
+      label: "Aggressive - Tối ưu SEO mạnh mẽ"
+
+# Workflow settings
+enable_debate_mode:
+  prompt: "Bật chế độ debate (tranh luận) để cải thiện chất lượng ý tưởng?"
+  default: true
+  result: "{value}"
+
+enable_market_research:
+  prompt: "Bật nghiên cứu thị trường tự động trước khi viết?"
+  default: true
+  result: "{value}"
+
+# Output format preferences
+preferred_output_format:
+  prompt: "Format output ưa thích?"
+  default: "markdown"
+  result: "{value}"
+  single-select:
+    - value: "markdown"
+      label: "Markdown (.md)"
+    - value: "html"
+      label: "HTML (.html)"
+    - value: "both"
+      label: "Cả hai (Markdown + HTML)"

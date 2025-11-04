@@ -1,0 +1,6 @@
+# Cấu hình cho Module SEO Writing (sew)
+user_name: FGCare
+communication_language: Vietnamese
+document_output_language: Vietnamese
+sessions_output_folder: "{project-root}/bmad/sew/sessions" # Đường dẫn lưu các file trạng thái (progress)
+final_output_folder: "{project-root}/output" # Đường dẫn lưu các bài viết hoàn chỉnh

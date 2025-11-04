@@ -1,0 +1,380 @@
+<task id="bmad/sew/tasks/state-manager.task.xml" name="State Manager">
+  <objective>
+    Quản lý state file YAML cho SEO article rewriting projects.
+    Hỗ trợ: init (khởi tạo), update (cập nhật), load (đọc), list (liệt kê projects).
+  </objective>
+
+  <parameters>
+    <param name="action" type="string" required="true">
+      Action: "init" | "update" | "load" | "list"
+    </param>
+    <param name="project_id" type="string" required="false">
+      Project identifier (required for init/update/load)
+    </param>
+    <param name="sessions_folder" type="string" required="false">
+      Base sessions folder path. Default: {project-root}/bmad/sew/sessions
+    </param>
+    <param name="data" type="object" required="false">
+      Data to update/initialize (for init/update actions).
+      Structure:
+      {
+        project: { id, title, source_url, created_date, last_updated },
+        workflow: { status, current_step, completed_steps, total_steps },
+        variables: { raw_content, analysis_report, ... },
+        human_approvals: [ { step, decision, timestamp, feedback } ],
+        config: { ... }
+      }
+    </param>
+  </parameters>
+
+  <output>
+    <param name="result" type="object">
+      Result object:
+      - action: "init" → { success: true, state_file_path: "..." }
+      - action: "update" → { success: true, updated_fields: [...] }
+      - action: "load" → { success: true, state: {...} }
+      - action: "list" → { success: true, projects: [{id, title, status, step, updated}] }
+    </param>
+    <param name="success" type="boolean">Operation success status</param>
+    <param name="message" type="string">Result message</param>
+    <param name="error" type="string">Error message if failed</param>
+  </output>
+
+  <flow>
+    <!-- Step 1: Validate inputs -->
+    <step n="1" goal="Validate inputs and determine paths">
+      <action>
+        Validate {{action}} is one of: init, update, load, list
+      </action>
+
+      <check if="{{action}} != 'list' AND {{project_id}} is empty">
+        <action>Set {{success}} = false</action>
+        <action>Set {{error}} = "project_id is required for action: {{action}}"</action>
+        <goto step="999">Exit with error</goto>
+      </check>
+
+      <action>
+        Set {{sessions_folder}} = {{sessions_folder}} OR "{project-root}/bmad/sew/sessions"
+      </action>
+
+      <action>
+        Set {{project_folder}} = "{{sessions_folder}}/{{project_id}}"
+      </action>
+
+      <action>
+        Set {{state_file_path}} = "{{project_folder}}/state.yaml"
+      </action>
+    </step>
+
+    <!-- Step 2: Route to appropriate action -->
+    <step n="2" goal="Execute action based on type">
+      <check if="{{action}} == 'init'">
+        <goto step="10">Initialize new project</goto>
+      </check>
+
+      <check if="{{action}} == 'update'">
+        <goto step="20">Update existing state</goto>
+      </check>
+
+      <check if="{{action}} == 'load'">
+        <goto step="30">Load state</goto>
+      </check>
+
+      <check if="{{action}} == 'list'">
+        <goto step="40">List all projects</goto>
+      </check>
+
+      <action>Set {{success}} = false</action>
+      <action>Set {{error}} = "Unknown action: {{action}}"</action>
+      <goto step="999">Exit with error</goto>
+    </step>
+
+    <!-- Step 10-12: INIT action -->
+    <step n="10" goal="Initialize new project state">
+      <action>
+        Check if {{project_folder}} already exists
+      </action>
+
+      <check if="folder exists">
+        <action>Set {{success}} = false</action>
+        <action>Set {{error}} = "Project already exists: {{project_id}}"</action>
+        <goto step="999">Exit with error</goto>
+      </check>
+
+      <action>
+        Create folder: {{project_folder}}
+      </action>
+
+      <action>
+        Get current timestamp: {{now}}
+      </action>
+
+      <action>
+        Create default state structure:
+
+        project:
+          id: {{project_id}}
+          title: {{data.project.title}} OR "Untitled Project"
+          created_date: {{now}}
+          last_updated: {{now}}
+          source_url: {{data.project.source_url}} OR ""
+          author: {{data.config.user_name}} OR "Unknown"
+
+        workflow:
+          name: seo-article-rewriting
+          status: new
+          current_step: 0
+          completed_steps: []
+          total_steps: 9
+
+        variables: {}
+
+        human_approvals: []
+
+        config:
+          communication_language: {{data.config.communication_language}} OR "Vietnamese"
+          document_output_language: {{data.config.document_output_language}} OR "Vietnamese"
+          user_name: {{data.config.user_name}} OR "User"
+          sessions_folder: {{sessions_folder}}
+      </action>
+
+      <action>
+        Merge {{data}} into default state structure (if provided)
+      </action>
+    </step>
+
+    <step n="11" goal="Write state to YAML file">
+      <action>
+        Convert state object to YAML format
+      </action>
+
+      <action>
+        Write YAML to file: {{state_file_path}}
+      </action>
+
+      <check if="write failed">
+        <action>Set {{success}} = false</action>
+        <action>Set {{error}} = "Failed to write state file"</action>
+        <goto step="999">Exit with error</goto>
+      </check>
+    </step>
+
+    <step n="12" goal="Return init result">
+      <action>
+        Set {{result}} = {
+          success: true,
+          action: "init",
+          project_id: {{project_id}},
+          state_file_path: {{state_file_path}},
+          project_folder: {{project_folder}}
+        }
+      </action>
+
+      <action>Set {{success}} = true</action>
+      <action>Set {{message}} = "Project initialized: {{project_id}}"</action>
+      <goto step="999">Exit success</goto>
+    </step>
+
+    <!-- Step 20-22: UPDATE action -->
+    <step n="20" goal="Update existing state">
+      <action>
+        Check if {{state_file_path}} exists
+      </action>
+
+      <check if="file not exists">
+        <action>Set {{success}} = false</action>
+        <action>Set {{error}} = "State file not found: {{state_file_path}}"</action>
+        <goto step="999">Exit with error</goto>
+      </check>
+
+      <action>
+        Read existing state from {{state_file_path}}
+      </action>
+
+      <action>
+        Parse YAML to object: {{existing_state}}
+      </action>
+    </step>
+
+    <step n="21" goal="Merge update data">
+      <action>
+        Get current timestamp: {{now}}
+      </action>
+
+      <action>
+        Deep merge {{data}} into {{existing_state}}:
+        - If data.workflow provided → merge into state.workflow
+        - If data.variables provided → merge into state.variables
+        - If data.human_approvals provided → append to array
+        - If data.project provided → merge into state.project
+      </action>
+
+      <action>
+        Update {{existing_state.project.last_updated}} = {{now}}
+      </action>
+
+      <action>
+        Create backup: {{state_file_path}}.backup
+      </action>
+
+      <action>
+        Convert merged state to YAML
+      </action>
+
+      <action>
+        Write YAML to {{state_file_path}}
+      </action>
+
+      <check if="write failed">
+        <action>Restore from backup</action>
+        <action>Set {{success}} = false</action>
+        <action>Set {{error}} = "Failed to update state file"</action>
+        <goto step="999">Exit with error</goto>
+      </check>
+    </step>
+
+    <step n="22" goal="Return update result">
+      <action>
+        Extract updated field names from {{data}}
+      </action>
+
+      <action>
+        Set {{result}} = {
+          success: true,
+          action: "update",
+          project_id: {{project_id}},
+          updated_fields: [...field names],
+          state_file_path: {{state_file_path}}
+        }
+      </action>
+
+      <action>Set {{success}} = true</action>
+      <action>Set {{message}} = "State updated for project: {{project_id}}"</action>
+      <goto step="999">Exit success</goto>
+    </step>
+
+    <!-- Step 30-31: LOAD action -->
+    <step n="30" goal="Load state from file">
+      <action>
+        Check if {{state_file_path}} exists
+      </action>
+
+      <check if="file not exists">
+        <action>Set {{success}} = false</action>
+        <action>Set {{error}} = "State file not found: {{state_file_path}}"</action>
+        <goto step="999">Exit with error</goto>
+      </check>
+
+      <action>
+        Read state file: {{state_file_path}}
+      </action>
+
+      <action>
+        Parse YAML to object: {{state}}
+      </action>
+
+      <check if="parse failed">
+        <action>
+          Check if backup exists: {{state_file_path}}.backup
+        </action>
+
+        <check if="backup exists">
+          <action>Load from backup instead</action>
+          <action>Set {{message}} = "Loaded from backup (main file corrupted)"</action>
+        </check>
+
+        <check if="else">
+          <action>Set {{success}} = false</action>
+          <action>Set {{error}} = "State file corrupted and no backup found"</action>
+          <goto step="999">Exit with error</goto>
+        </check>
+      </check>
+    </step>
+
+    <step n="31" goal="Return loaded state">
+      <action>
+        Set {{result}} = {
+          success: true,
+          action: "load",
+          project_id: {{project_id}},
+          state: {{state}},
+          state_file_path: {{state_file_path}}
+        }
+      </action>
+
+      <action>Set {{success}} = true</action>
+      <action>Set {{message}} = "State loaded for project: {{project_id}}"</action>
+      <goto step="999">Exit success</goto>
+    </step>
+
+    <!-- Step 40-41: LIST action -->
+    <step n="40" goal="List all projects">
+      <action>
+        Scan {{sessions_folder}} for subdirectories
+      </action>
+
+      <action>
+        Initialize empty array: {{projects}}
+      </action>
+
+      <action>
+        For each subdirectory in sessions_folder:
+          1. Set project_id = directory name
+          2. Check if state.yaml exists in directory
+          3. If exists:
+             - Read and parse state.yaml
+             - Extract: id, title, workflow.status, workflow.current_step, workflow.total_steps, project.last_updated
+             - Add to {{projects}} array:
+               {
+                 id: project_id,
+                 title: title,
+                 status: status,
+                 current_step: current_step,
+                 total_steps: total_steps,
+                 progress: "X/Y steps",
+                 last_updated: last_updated,
+                 last_updated_relative: "2h ago" | "1 day ago"
+               }
+      </action>
+
+      <action>
+        Sort {{projects}} by last_updated (newest first)
+      </action>
+    </step>
+
+    <step n="41" goal="Return projects list">
+      <action>
+        Calculate statistics:
+        - total_projects = projects.length
+        - in_progress_count = count where status == "in_progress"
+        - completed_count = count where status == "completed"
+        - failed_count = count where status == "failed"
+      </action>
+
+      <action>
+        Set {{result}} = {
+          success: true,
+          action: "list",
+          projects: {{projects}},
+          statistics: {
+            total: total_projects,
+            in_progress: in_progress_count,
+            completed: completed_count,
+            failed: failed_count
+          }
+        }
+      </action>
+
+      <action>Set {{success}} = true</action>
+      <action>Set {{message}} = "Found {{total_projects}} projects"</action>
+      <goto step="999">Exit success</goto>
+    </step>
+
+    <!-- Step 999: Exit -->
+    <step n="999" goal="Return final result">
+      <action>
+        Return {{result}} with {{success}}, {{message}}, and {{error}} (if any)
+      </action>
+    </step>
+  </flow>
+</task>

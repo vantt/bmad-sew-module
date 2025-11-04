@@ -1,0 +1,79 @@
+<task id="bmad/sew/tasks/preliminary-market-research.task.xml" name="Preliminary Market Research">
+  <objective>Thực hiện nghiên cứu thị trường sơ bộ để xác định các chủ đề nóng, câu hỏi người dùng và xu hướng ngách liên quan đến một chủ đề cụ thể, sử dụng agent MarketInsightAgent.</objective>
+
+  <parameters>
+    <param name="topic" type="string" required="true">Chủ đề cần nghiên cứu thị trường.</param>
+    <param name="output_file" type="string" required="false">Đường dẫn file để lưu báo cáo market insight (YAML). Nếu không cung cấp, chỉ trả về kết quả trong bộ nhớ.</param>
+  </parameters>
+
+  <output>
+    <param name="market_insight_report" type="string">Báo cáo tổng hợp các insight thị trường ở định dạng YAML.</param>
+  </output>
+
+  <flow>
+    <step n="1" goal="Tìm các chủ đề nóng">
+      <action>
+        Gọi agent `MarketInsightAgent` để tìm các chủ đề nóng liên quan đến chủ đề đã cho.
+      </action>
+      <invoke-task
+          exec="bmad/core/tasks/invoke-agent.xml"
+          agent_id="bmad/sew/agents/market-insight-agent.agent.yaml"
+          command="*find-hot-topics --chủ_đề '{{topic}}'"
+          output_variable="hot_topics_report"
+      />
+    </step>
+
+    <step n="2" goal="Tìm các câu hỏi người dùng">
+      <action>
+        Gọi agent `MarketInsightAgent` để tìm các câu hỏi người dùng liên quan đến chủ đề đã cho.
+      </action>
+      <invoke-task
+          exec="bmad/core/tasks/invoke-agent.xml"
+          agent_id="bmad/sew/agents/market-insight-agent.agent.yaml"
+          command="*find-user-questions --chủ_đề '{{topic}}'"
+          output_variable="user_questions_report"
+      />
+    </step>
+
+    <step n="3" goal="Tìm các xu hướng ngách">
+      <action>
+        Gọi agent `MarketInsightAgent` để tìm các xu hướng ngách liên quan đến chủ đề đã cho.
+      </action>
+      <invoke-task
+          exec="bmad/core/tasks/invoke-agent.xml"
+          agent_id="bmad/sew/agents/market-insight-agent.agent.yaml"
+          command="*find-niche-trends --chủ_đề '{{topic}}'"
+          output_variable="niche_trends_report"
+      />
+    </step>
+
+    <step n="4" goal="Tổng hợp báo cáo insight thị trường">
+      <action>
+        Tổng hợp các báo cáo từ các bước trước thành một báo cáo insight thị trường hoàn chỉnh ở định dạng YAML.
+      </action>
+      <output>
+        <param name="market_insight_report" type="string">
+          ```yaml
+          hot_topics: {{hot_topics_report}}
+          user_questions: {{user_questions_report}}
+          niche_trends: {{niche_trends_report}}
+          ```
+        </param>
+      </output>
+    </step>
+
+    <step n="5" goal="Lưu báo cáo vào file nếu output_file được cung cấp">
+      <check if="{{output_file}} is not empty">
+        <action>
+          Tạo thư mục cha của {{output_file}} nếu chưa tồn tại.
+        </action>
+        <action>
+          Ghi nội dung {{market_insight_report}} vào file {{output_file}}.
+        </action>
+        <action>
+          Hiển thị: "✓ Saved: {{output_file}}"
+        </action>
+      </check>
+    </step>
+  </flow>
+</task>

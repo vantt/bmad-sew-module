@@ -1,0 +1,70 @@
+<task id="bmad/sew/tasks/quality-assurance-and-formatting.task.xml" name="Quality Assurance and Formatting">
+  <objective>Thực hiện kiểm tra chất lượng cuối cùng và định dạng nội dung để sẵn sàng xuất bản.</objective>
+
+  <parameters>
+    <param name="seo_optimized_draft" type="string" required="true">Bản nháp đã được tối ưu SEO cần được kiểm tra và định dạng.</param>
+    <param name="output_file" type="string" required="false">Đường dẫn file để lưu nội dung cuối cùng (YAML). Nếu không cung cấp, chỉ trả về kết quả trong bộ nhớ.</param>
+  </parameters>
+
+  <output>
+    <param name="final_publishable_content" type="string">Nội dung cuối cùng đã được định dạng cho các nền tảng xuất bản.</param>
+  </output>
+
+  <flow>
+    <step n="1" goal="Gọi agent QAEditor để kiểm tra chất lượng">
+      <action>
+        Gọi agent `QAEditor` để thực hiện kiểm tra chất lượng toàn diện cho bản nháp.
+      </action>
+      <invoke-task
+          exec="bmad/core/tasks/invoke-agent.xml"
+          agent_id="bmad/sew/agents/qa-editor.agent.yaml"
+          command="*quality-audit --text_to_audit '{{seo_optimized_draft}}'"
+          output_variable="qa_report"
+      />
+    </step>
+
+    <step n="2" goal="Gọi agent PublishingFormatter để định dạng nội dung">
+      <action>
+        Gọi agent `PublishingFormatter` để định dạng nội dung đã được kiểm tra chất lượng.
+      </action>
+      <invoke-task
+          exec="bmad/core/tasks/invoke-agent.xml"
+          agent_id="bmad/sew/agents/publishing-formatter.agent.yaml"
+          command="*format-for-wordpress --input '{{qa_report.revised_text}}'"
+          output_variable="formatted_content_wp"
+      />
+      <invoke-task
+          exec="bmad/core/tasks/invoke-agent.xml"
+          agent_id="bmad/sew/agents/publishing-formatter.agent.yaml"
+          command="*format-for-pdf --input '{{qa_report.revised_text}}'"
+          output_variable="formatted_content_pdf"
+      />
+    </step>
+
+    <step n="3" goal="Tổng hợp nội dung đã định dạng">
+        <action>Tổng hợp các định dạng nội dung khác nhau thành một output cuối cùng.</action>
+        <output>
+            <param name="final_publishable_content" type="string">
+                ```yaml
+                wordpress_html: {{formatted_content_wp}}
+                pdf_html: {{formatted_content_pdf}}
+                ```
+            </param>
+        </output>
+    </step>
+
+    <step n="4" goal="Lưu nội dung cuối cùng vào file nếu output_file được cung cấp">
+      <check if="{{output_file}} is not empty">
+        <action>
+          Tạo thư mục cha của {{output_file}} nếu chưa tồn tại.
+        </action>
+        <action>
+          Ghi nội dung {{final_publishable_content}} vào file {{output_file}}.
+        </action>
+        <action>
+          Hiển thị: "✓ Saved: {{output_file}}"
+        </action>
+      </check>
+    </step>
+  </flow>
+</task>

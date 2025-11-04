@@ -1,0 +1,114 @@
+<task id="bmad/sew/tasks/fetch-and-save-content.task.xml" name="Fetch and Save Content">
+  <objective>Trích xuất nội dung chính từ URL và lưu vào file Markdown. Task này sử dụng tool scrape-url để lấy nội dung sạch từ web page và tự động lưu kết quả vào file.</objective>
+
+  <parameters>
+    <param name="url" type="string" required="true">URL của bài viết cần trích xuất nội dung.</param>
+    <param name="output_file" type="string" required="false">Đường dẫn file output (mặc định: {sessions_output_folder}/fetched-content-{timestamp}.md).</param>
+    <param name="sessions_output_folder" type="string" required="false">Thư mục lưu sessions (từ config).</param>
+  </parameters>
+
+  <output>
+    <param name="content" type="string">Nội dung Markdown đã được trích xuất.</param>
+    <param name="output_path" type="string">Đường dẫn file đã được lưu.</param>
+    <param name="success" type="boolean">Trạng thái thành công/thất bại.</param>
+  </output>
+
+  <flow>
+    <step n="1" goal="Xác định output file path">
+      <action>
+        Nếu {{output_file}} được cung cấp, sử dụng nó.
+        Nếu không, tạo file name với timestamp: fetched-content-{YYYY-MM-DD-HHmmss}.md
+        Đường dẫn đầy đủ: {{sessions_output_folder}}/fetched-content-{timestamp}.md
+      </action>
+      <action>Store output path as {{final_output_path}}</action>
+    </step>
+
+    <step n="2" goal="Trích xuất nội dung từ URL">
+      <action>
+        Sử dụng tool scrape-url để trích xuất nội dung từ {{url}}
+      </action>
+      <invoke-tool
+          name="scrape-url"
+          url="{{url}}"
+          output_variable="raw_content"
+      />
+    </step>
+
+    <step n="3" goal="Kiểm tra và làm sạch nội dung">
+      <action>
+        Kiểm tra {{raw_content}} có hợp lệ không.
+        Nếu rỗng hoặc lỗi, set {{success}} = false và return error message.
+      </action>
+
+      <check if="{{raw_content}} is empty or error">
+        <action>Set {{success}} = false</action>
+        <action>Set {{error_message}} = "Không thể trích xuất nội dung từ URL: {{url}}"</action>
+        <output>
+          <param name="success" type="boolean">false</param>
+          <param name="error_message" type="string">{{error_message}}</param>
+        </output>
+        <goto step="999">Skip to end</goto>
+      </check>
+
+      <action>
+        Làm sạch và format nội dung Markdown:
+        - Đảm bảo headers có khoảng trống
+        - Format lists đúng chuẩn
+        - Loại bỏ whitespace thừa
+      </action>
+      <action>Store cleaned content as {{cleaned_content}}</action>
+    </step>
+
+    <step n="4" goal="Thêm metadata vào đầu file">
+      <action>
+        Tạo header metadata cho file Markdown:
+        ```markdown
+        ---
+        source_url: {{url}}
+        fetched_date: {current_timestamp}
+        tool: scrape-url (firecrawl)
+        ---
+
+        # Nội dung từ: {{url}}
+
+        {{cleaned_content}}
+        ```
+      </action>
+      <action>Store final content as {{final_content}}</action>
+    </step>
+
+    <step n="5" goal="Lưu nội dung vào file">
+      <action>
+        Tạo thư mục nếu chưa tồn tại: {{sessions_output_folder}}
+      </action>
+      <action>
+        Ghi {{final_content}} vào file: {{final_output_path}}
+        Sử dụng Write tool hoặc standard file write
+      </action>
+      <action>Xác nhận file đã được tạo thành công</action>
+    </step>
+
+    <step n="6" goal="Trả về kết quả">
+      <action>
+        Return thông tin về nội dung và file đã lưu
+      </action>
+      <output>
+        <param name="content" type="string">{{final_content}}</param>
+        <param name="output_path" type="string">{{final_output_path}}</param>
+        <param name="success" type="boolean">true</param>
+        <param name="message" type="string">Đã trích xuất và lưu nội dung thành công vào: {{final_output_path}}</param>
+      </output>
+    </step>
+
+    <step n="999" goal="Error exit point">
+      <!-- This step is reached via goto when there's an error -->
+    </step>
+  </flow>
+
+  <notes>
+    <note>Task này yêu cầu firecrawl-cli được cài đặt và cấu hình với FIRECRAWL_API_KEY</note>
+    <note>Output file sẽ có format: fetched-content-YYYY-MM-DD-HHmmss.md</note>
+    <note>File được lưu trong sessions_output_folder để dễ quản lý và cleanup</note>
+    <note>Metadata ở đầu file giúp tracking source và thời gian fetch</note>
+  </notes>
+</task>

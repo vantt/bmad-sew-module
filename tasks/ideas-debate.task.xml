@@ -1,0 +1,58 @@
+<task id="bmad/sew/tasks/ideas-debate.task.xml" name="Ideas Debate">
+  <objective>Điều hành một cuộc tranh luận giữa các agent chuyên gia để ưu tiên hóa các ý tưởng cho bài viết mới.</objective>
+
+  <parameters>
+    <param name="topic" type="string" required="true">Chủ đề chính của cuộc tranh luận (ví dụ: "Các ý tưởng cho bài viết mới").</param>
+    <param name="content_analysis_report" type="string" required="true">Báo cáo phân tích nội dung từ ContentAnalyzer.</param>
+    <param name="market_insight_report" type="string" required="true">Báo cáo insight thị trường từ MarketInsightAgent.</param>
+    <param name="seo_preliminary_analysis" type="string" required="true">Phân tích SEO sơ bộ từ SEOSpecialist (nếu có).</param>
+    <param name="cultural_context" type="string" required="true">Ngữ cảnh văn hóa từ các tệp hỗ trợ.</param>
+    <param name="output_file" type="string" required="false">Đường dẫn file để lưu kết quả tranh luận ý tưởng (YAML). Nếu không cung cấp, chỉ trả về kết quả trong bộ nhớ.</param>
+  </parameters>
+
+  <output>
+    <param name="curated_ideas" type="string">Danh sách các ý tưởng đã được xếp hạng và ưu tiên hóa.</param>
+    <param name="debate_summary" type="string">Tóm tắt quá trình tranh luận.</param>
+  </output>
+
+  <flow>
+    <step n="1" goal="Gọi agent DebateModerator để điều hành tranh luận ý tưởng">
+      <action>
+        Gọi agent `DebateModerator` để điều hành cuộc tranh luận về các ý tưởng cho bài viết mới.
+      </action>
+      <invoke-task
+          exec="bmad/core/tasks/invoke-agent.xml"
+          agent_id="bmad/sew/agents/debate-moderator.agent.yaml"
+          command="*run-debate --topic '{{topic}}' --debaters 'ContentAnalyzer, MarketInsightAgent, SEOSpecialist, AdaptiveWriter' --scoring_criteria 'SEO Performance, Cultural Resonance, Engagement Potential, Strategic Alignment' --context_data '{{content_analysis_report}}, {{market_insight_report}}, {{seo_preliminary_analysis}}, {{cultural_context}}'"
+          output_variable="debate_results"
+      />
+    </step>
+
+    <step n="2" goal="Trích xuất ý tưởng đã chọn lọc và tóm tắt tranh luận">
+      <action>
+        Trích xuất `ranked_ideas` và `debate_summary` từ `debate_results`.
+      </action>
+      <output>
+        <param name="curated_ideas" type="string">{{debate_results.ranked_ideas}}</param>
+        <param name="debate_summary" type="string">{{debate_results.debate_summary}}</param>
+      </output>
+    </step>
+
+    <step n="3" goal="Lưu kết quả vào file nếu output_file được cung cấp">
+      <check if="{{output_file}} is not empty">
+        <action>
+          Tạo thư mục cha của {{output_file}} nếu chưa tồn tại.
+        </action>
+        <action>
+          Tổng hợp nội dung YAML: curated_ideas + debate_summary
+        </action>
+        <action>
+          Ghi nội dung vào file {{output_file}}.
+        </action>
+        <action>
+          Hiển thị: "✓ Saved: {{output_file}}"
+        </action>
+      </check>
+    </step>
+  </flow>
+</task>

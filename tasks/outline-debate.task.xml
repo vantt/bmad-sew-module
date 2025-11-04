@@ -1,0 +1,55 @@
+<task id="bmad/sew/tasks/outline-debate.task.xml" name="Outline Debate">
+  <objective>Điều hành một cuộc tranh luận giữa các agent chuyên gia để tạo ra một dàn ý bài viết có cấu trúc, chuẩn SEO.</objective>
+
+  <parameters>
+    <param name="topic" type="string" required="true">Chủ đề chính của cuộc tranh luận (ví dụ: "Xây dựng dàn ý cho bài viết mới").</param>
+    <param name="approved_ideas" type="string" required="true">Danh sách các ý tưởng đã được phê duyệt để xây dựng dàn ý.</param>
+    <param name="output_file" type="string" required="false">Đường dẫn file để lưu kết quả tranh luận dàn ý (YAML). Nếu không cung cấp, chỉ trả về kết quả trong bộ nhớ.</param>
+  </parameters>
+
+  <output>
+    <param name="curated_outline" type="string">Dàn ý đã được xếp hạng và ưu tiên hóa.</param>
+    <param name="debate_summary" type="string">Tóm tắt quá trình tranh luận.</param>
+  </output>
+
+  <flow>
+    <step n="1" goal="Gọi agent DebateModerator để điều hành tranh luận về dàn ý">
+      <action>
+        Gọi agent `DebateModerator` để điều hành cuộc tranh luận về việc xây dựng dàn ý.
+      </action>
+      <invoke-task
+          exec="bmad/core/tasks/invoke-agent.xml"
+          agent_id="bmad/sew/agents/debate-moderator.agent.yaml"
+          command="*run-debate --topic '{{topic}}' --debaters 'ContentAnalyzer, MarketInsightAgent, SEOSpecialist, AdaptiveWriter' --scoring_criteria 'Logical Flow, SEO Keyword Distribution, Cultural Flow, Hook Effectiveness' --context_data '{{approved_ideas}}'"
+          output_variable="debate_results"
+      />
+    </step>
+
+    <step n="2" goal="Trích xuất dàn ý đã chọn lọc và tóm tắt tranh luận">
+      <action>
+        Trích xuất `ranked_ideas` (trong trường hợp này là dàn ý) và `debate_summary` từ `debate_results`.
+      </action>
+      <output>
+        <param name="curated_outline" type="string">{{debate_results.ranked_ideas}}</param>
+        <param name="debate_summary" type="string">{{debate_results.debate_summary}}</param>
+      </output>
+    </step>
+
+    <step n="3" goal="Lưu kết quả vào file nếu output_file được cung cấp">
+      <check if="{{output_file}} is not empty">
+        <action>
+          Tạo thư mục cha của {{output_file}} nếu chưa tồn tại.
+        </action>
+        <action>
+          Tổng hợp nội dung YAML: curated_outline + debate_summary
+        </action>
+        <action>
+          Ghi nội dung vào file {{output_file}}.
+        </action>
+        <action>
+          Hiển thị: "✓ Saved: {{output_file}}"
+        </action>
+      </check>
+    </step>
+  </flow>
+</task>

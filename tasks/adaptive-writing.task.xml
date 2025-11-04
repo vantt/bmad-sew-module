@@ -1,0 +1,48 @@
+<task id="bmad/sew/tasks/adaptive-writing.task.xml" name="Adaptive Writing">
+  <objective>Viết bản nháp đầu tiên của bài viết, đảm bảo sự phù hợp về mặt văn hóa và ngôn ngữ, dựa trên dàn ý và các phân tích đã được phê duyệt.</objective>
+
+  <parameters>
+    <param name="final_outline" type="string" required="true">Dàn ý cuối cùng đã được phê duyệt.</param>
+    <param name="analysis_report" type="string" required="true">Báo cáo phân tích nội dung từ ContentAnalyzer.</param>
+    <param name="customer_persona" type="string" required="true">Mô tả chân dung khách hàng.</param>
+    <param name="brand_guideline" type="string" required="true">Hướng dẫn thương hiệu.</param>
+    <param name="cultural_lexicon" type="string" required="true">Từ điển văn hóa.</param>
+    <param name="output_file" type="string" required="false">Đường dẫn file để lưu bản nháp đầu tiên (Markdown). Nếu không cung cấp, chỉ trả về kết quả trong bộ nhớ.</param>
+  </parameters>
+
+  <output>
+    <param name="first_draft" type="string">Bản nháp đầu tiên của bài viết ở định dạng Markdown.</param>
+  </output>
+
+  <flow>
+    <step n="1" goal="Gọi agent AdaptiveWriter để viết bài">
+      <action>
+        Gọi agent `AdaptiveWriter` để viết bản nháp đầu tiên của bài viết.
+      </action>
+      <invoke-task
+          exec="bmad/core/tasks/invoke-agent.xml"
+          agent_id="bmad/sew/agents/adaptive-writer.agent.yaml"
+          command="*rewrite-article --final_outline '{{final_outline}}' --analysis_report '{{analysis_report}}' --customer_persona '{{customer_persona}}' --brand_guideline '{{brand_guideline}}' --cultural_lexicon '{{cultural_lexicon}}'"
+          output_variable="first_draft"
+      />
+    </step>
+
+    <step n="2" goal="Lưu bản nháp vào file nếu output_file được cung cấp">
+      <check if="{{output_file}} is not empty">
+        <action>
+          Tạo thư mục cha của {{output_file}} nếu chưa tồn tại.
+        </action>
+        <action>
+          Ghi nội dung {{first_draft}} vào file {{output_file}}.
+        </action>
+        <action>
+          Hiển thị: "✓ Saved: {{output_file}}"
+        </action>
+      </check>
+    </step>
+
+    <step n="3" goal="Trả về bản nháp đầu tiên">
+        <action>Trả về giá trị của biến `first_draft`.</action>
+    </step>
+  </flow>
+</task>

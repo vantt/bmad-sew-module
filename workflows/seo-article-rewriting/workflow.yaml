@@ -1,0 +1,31 @@
+# SEO Article Rewriting Workflow Template Configuration
+name: "seo-article-rewriting"
+description: "A multi-agent system to transform articles between languages while optimizing for SEO, Cultural Resonance, Engagement, and Strategic Alignment."
+author: "FGCare"
+version: "2.0.0-with-state-management"
+
+# Critical variables load from config_source
+config_source: "{project-root}/bmad/sew/config.yaml"
+output_folder: "{config_source}:final_output_folder"
+sessions_folder: "{config_source}:sessions_output_folder"
+user_name: "{config_source}:user_name"
+communication_language: "{config_source}:communication_language"
+document_output_language: "{config_source}:document_output_language"
+date: system-generated
+
+# Project identification (will be set in step 0)
+project_id: ""
+project_folder: ""
+state_file: ""
+
+# Module path and component files
+installed_path: "{project-root}/bmad/sew/workflows/seo-article-rewriting"
+template: "{installed_path}/template.md"
+instructions: "{installed_path}/instructions.md"
+validation: "{installed_path}/checklist.md"
+
+# Output configuration
+default_output_file: "{output_folder}/seo-article-{{date}}.md"
+
+# Invocation control
+standalone: true

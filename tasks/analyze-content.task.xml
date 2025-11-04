@@ -1,0 +1,48 @@
+<task id="bmad/sew/tasks/analyze-content.task.xml" name="Analyze Content">
+  <objective>Phân tích nội dung văn bản để xác định các khái niệm cốt lõi, mẫu tu từ, điểm yếu, và văn phong, trả về báo cáo YAML chi tiết bằng cách sử dụng agent ContentAnalyzer.</objective>
+
+  <parameters>
+    <param name="raw_content" type="string" required="true">Nội dung thô của bài viết cần phân tích.</param>
+    <param name="ethical_guidelines" type="string" required="true">Hướng dẫn đạo đức và pháp lý.</param>
+    <param name="cultural_context" type="string" required="true">Ngữ cảnh văn hóa.</param>
+    <param name="cultural_lexicon" type="string" required="true">Từ điển văn hóa.</param>
+    <param name="brand_guideline" type="string" required="true">Hướng dẫn thương hiệu.</param>
+    <param name="output_file" type="string" required="false">Đường dẫn file để lưu báo cáo phân tích (YAML). Nếu không cung cấp, chỉ trả về kết quả trong bộ nhớ.</param>
+  </parameters>
+
+  <output>
+    <param name="analysis_report" type="string">Báo cáo phân tích chi tiết ở định dạng YAML.</param>
+  </output>
+
+  <flow>
+    <step n="1" goal="Gọi agent ContentAnalyzer để phân tích nội dung">
+      <action>
+        Gọi agent `ContentAnalyzer` để thực hiện phân tích nội dung.
+      </action>
+      <invoke-task
+          exec="bmad/core/tasks/invoke-agent.xml"
+          agent_id="bmad/sew/agents/content-analyzer.agent.yaml"
+          command="*analyze-content --input '{{raw_content}}' --ethical_guidelines '{{ethical_guidelines}}' --cultural_context '{{cultural_context}}' --cultural_lexicon '{{cultural_lexicon}}' --brand_guideline '{{brand_guideline}}'"
+          output_variable="analysis_report"
+      />
+    </step>
+
+    <step n="2" goal="Lưu báo cáo vào file nếu output_file được cung cấp">
+      <check if="{{output_file}} is not empty">
+        <action>
+          Tạo thư mục cha của {{output_file}} nếu chưa tồn tại.
+        </action>
+        <action>
+          Ghi nội dung {{analysis_report}} vào file {{output_file}}.
+        </action>
+        <action>
+          Hiển thị: "✓ Saved: {{output_file}}"
+        </action>
+      </check>
+    </step>
+
+    <step n="3" goal="Trả về báo cáo phân tích">
+        <action>Trả về giá trị của biến `analysis_report`.</action>
+    </step>
+  </flow>
+</task>
