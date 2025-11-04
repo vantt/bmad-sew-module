@@ -1,3 +1,4 @@
+﻿[Back to Module README](../README.md)
 
 ---
 last-redoc-date: 2025-11-04
@@ -5,10 +6,10 @@ last-redoc-date: 2025-11-04
 
 # Agents Overview
 
-Các agent của module SEW chia thành ba tuyến:
+The SEW module uses nine agents organized into three functional tiers.
 
-1. **Điều phối:** `master-orchestrator.md` kết nối người dùng, workflow, state manager và các gate phê duyệt.
-2. **Phân tích & chuẩn bị:** `content-fetcher.md`, `content-analyzer.md`, `market-insight-agent.md`, `debate-moderator.md`, `qa-editor.md` phối hợp để biến bài gốc thành bộ insight chiến lược và outline đã duyệt.
-3. **Sản xuất & hoàn thiện:** `adaptive-writer.md`, `seo-specialist.md`, `publishing-formatter.md` đảm nhiệm viết lại, tối ưu SEO và đóng gói xuất bản.
+1. **Orchestration** ? `master-orchestrator.md` connects operators to workflows, state manager, and approval gates.
+2. **Analysis & Preparation** ? `content-fetcher.md`, `content-analyzer.md`, `market-insight-agent.md`, `debate-moderator.md`, `qa-editor.md` transform the source article into vetted insights and review-ready outlines.
+3. **Production & Delivery** ? `adaptive-writer.md`, `seo-specialist.md`, `publishing-formatter.md` craft the localized draft, optimize SEO, and package outputs for publishing.
 
-Danh sách chi tiết nằm trong `AGENTS-CATALOG.md`. Mỗi agent được xây dựng theo chuẩn module agent của BMAD, menu kích hoạt workflow/tasks tương ứng, và đều nạp cấu hình từ `bmad/sew/config.yaml` để giữ đồng bộ output folder, ngôn ngữ và session.
+Consult `AGENTS-CATALOG.md` for command summaries and quick access to each agent. Every agent loads `bmad/sew/config.yaml` on activation so language preferences, output folders, and session paths stay synchronized across the system.

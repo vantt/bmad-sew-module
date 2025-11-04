@@ -1,3 +1,4 @@
+﻿[Back to Module README](../README.md)
 
 ---
 last-redoc-date: 2025-11-04
@@ -5,10 +6,17 @@ last-redoc-date: 2025-11-04
 
 # Workflows Overview
 
-Hiện module SEW sở hữu 01 workflow sản xuất: `seo-article-rewriting/`. Đây là chuỗi đa bước tự động hóa tái bút bài viết SEO với quản lý trạng thái phiên, các cổng phê duyệt con người và bộ agent chuyên biệt.
+The SEW module currently ships one production workflow: `seo-article-rewriting/`. It manages intake, context gathering, debate-driven ideation, adaptive drafting, human approvals, SEO optimization, and QA while persisting state at each step.
 
-| Workflow | Mô tả | Đầu ra chính |
-|----------|-------|--------------|
-| `seo-article-rewriting` | Điều phối lấy dữ liệu, phân tích thị trường, tranh luận ý tưởng, viết lại thích ứng và QA xuất bản. | `seo-article-<date>.md` + gói YAML trong thư mục session |
+| Workflow | Description | Primary Outputs |
+| -------- | ----------- | ---------------- |
+| `seo-article-rewriting` | Multi-agent rewrite pipeline with debate loops, state recovery, and dual approval gates | `{output_folder}/seo-article-<date>.md`, `{sessions_folder}/{project_id}/09-final-publishable.yaml` |
 
-Mỗi thư mục workflow chứa `workflow.yaml`, `instructions.md`, `template.md`, `checklist.md`, `README.md`. Khi phát triển workflow mới hãy bám chuẩn này để ReDoc nhận diện đúng và sinh tài liệu tự động.
+Each workflow folder contains `workflow.yaml`, `instructions.md`, `template.md` (if applicable), `checklist.md`, and `README.md`. Follow this structure when adding new workflows so the documentation set and validation tooling remain consistent.
+
+## Related Documentation
+
+- Lifecycle guide: `../docs/operators/workflow-lifecycle.md`
+- State management reference: `../docs/operators/state-management.md`
+- Workflow design guidelines: `../docs/developers/workflow-design.md`
+- Product requirements: `../docs/strategy/prd-seo-rewriting-project.md`

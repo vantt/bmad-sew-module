@@ -1,38 +1,61 @@
+﻿[Back to Module README](../../README.md) | [Up to Workflows Overview](../README.md)
+
 ---
 last-redoc-date: 2025-11-04
 ---
 
 # Workflow: SEO Article Rewriting
 
-## Tổng quan
+## Overview
 
-Workflow này phối hợp Master Orchestrator cùng sáu agent chuyên trách để tái tạo bài viết đa ngôn ngữ. Chuỗi tác vụ đi qua phân tích nội dung, nghiên cứu thị trường, tranh luận ý tưởng, phê duyệt thủ công và viết lại thích ứng nhằm bảo toàn giọng điệu thương hiệu. Điểm khác biệt là cơ chế quản lý trạng thái đa phiên (`state-manager.task.xml`) cho phép tạm dừng, tiếp tục hoặc nhảy bước mà vẫn giữ nguyên toàn bộ đầu ra trung gian.
+The flagship workflow orchestrates nine specialized agents to transform a source article into a Vietnamese-first, SEO-optimized deliverable. It combines automated analysis, debate-driven ideation, adaptive drafting, human approvals, and final QA. State is persisted after every step so operators can pause, resume, or branch without losing progress.
 
-Bộ context giàu dữ liệu (brand, persona, văn hóa, blacklist SEO) kết hợp với hai cổng phê duyệt con người (`human-outline-approval-gate`, `human-approval-gate`) đảm bảo bản viết cuối cùng đáp ứng chiến lược. Toàn bộ sản phẩm trung gian được lưu vào thư mục phiên để phục vụ hậu kiểm và tái sử dụng.
-
-## Cách kích hoạt
+## How to Run
 
 ```bash
 workflow bmad/sew/workflows/seo-article-rewriting/workflow.yaml
 ```
 
-Hoặc thông qua agent `master-orchestrator` với menu `*rewrite-seo-article`.
+Alternatively trigger `*rewrite-seo-article` from the `master-orchestrator` agent menu. See `docs/operators/quick-start.md` for launch steps.
 
-## Đầu vào chính
+## Inputs
 
-- URL bài viết gốc cùng các yêu cầu tái bút được thu thập ở bước khởi tạo.
-- Bộ dữ liệu ngữ cảnh trong `context_files/`: `customer_persona.md`, `brand_guideline.md`, `mission.md`, `culture.md`, `business_vision.md`, `competitor_analysis.csv`, `cultural_lexicon.csv`, `seo_blacklist.txt`.
-- Cấu hình trong `bmad/sew/config.yaml` quyết định thư mục đầu ra, thư mục sessions và tham số hiển thị.
+- Source article URL plus rewrite requirements gathered during Step 0 intake
+- Context files in `context_files/` (brand guideline, mission, personas, cultural lexicon, competitor analysis, SEO blacklist)
+- Module configuration from `bmad/sew/config.yaml` (language, output folders, reviewer contact)
 
-## Đầu ra
+## Outputs
 
-- Tệp tổng hợp `seo-article-<date>.md` tại `{output_folder}` chứa đầy đủ biến đã điền.
-- Bộ tài liệu trung gian trong `{sessions_folder}/{project_id}/`:
-  - `01-raw-content.md` → `09-final-publishable.yaml` cùng `state.yaml`.
-  - Các báo cáo phân tích, danh sách ý tưởng, dàn ý, bản nháp, bản tối ưu SEO và kết quả QA.
+- Final Markdown article: `{output_folder}/seo-article-<date>.md`
+- Publishing package and QA summary: `{sessions_folder}/{project_id}/09-final-publishable.yaml`
+- Intermediate artefacts: `{sessions_folder}/{project_id}/01-raw-content.md` through `08-seo-optimized.md`, plus `state.yaml` and `state.yaml.backup`
 
-## Điểm nổi bật
+## Step Highlights
 
-- Quản lý tiến trình có thể resume và nhảy bước mà không mất dữ liệu.
-- Hai vòng phê duyệt người dùng bảo đảm bám sát chiến lược thương hiệu.
-- Chuỗi tác vụ tự động `adaptive-writing`, `seo-optimization`, `quality-assurance-and-formatting` khóa chặt chất lượng xuất bản.
+1. **Project Setup** ? Generate or resume project ID, initialize state
+2. **Fetch Content** ? Normalize source article with `fetch-and-save-content`
+3. **Dual Analysis** ? Produce content and market insight reports
+4. **Ideas Debate** ? Multi-agent argumentation over strategic angles
+5. **Human Approval** ? Reviewer selects winning ideas (`human-approval-gate`)
+6. **Outline Debate** ? Build SEO-aware structure for the article
+7. **Human Approval** ? Reviewer validates outline (`human-outline-approval-gate`)
+8. **Draft & Optimize** ? Adaptive writing followed by SEO refinement
+9. **QA & Package** ? Grammar checks, formatting, and publishing bundle creation
+
+Resume support allows operators to re-run any step using stored artefacts and `*jump-to-step`.
+
+## Human Review
+
+Two approval stages capture reviewer decisions inside `state.yaml`:
+
+- Step 4: Idea approval (`04-approved-ideas.yaml`)
+- Step 6/8: Outline and final draft approvals (`06-final-outline.yaml`, `09-final-publishable.yaml`)
+
+Guidance for reviewers lives in `docs/operators/human-approval.md`.
+
+## Related Documentation
+
+- Operator lifecycle: `docs/operators/workflow-lifecycle.md`
+- State management: `docs/operators/state-management.md`
+- System PRD: `docs/strategy/prd-seo-rewriting-project.md`
+- Agent catalog: `../agents/AGENTS-CATALOG.md`
