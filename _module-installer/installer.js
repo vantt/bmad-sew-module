@@ -60,8 +60,8 @@ async function createOutputDirectories(projectRoot, config, logger) {
   logger.log(chalk.cyan('Creating output directories...'));
 
   const directories = [
-    config.sessions_output_folder,
-    config.final_output_folder,
+    resolveConfigPath(projectRoot, config.sessions_output_folder),
+    resolveConfigPath(projectRoot, config.final_output_folder),
     path.join(projectRoot, 'bmad/sew/workflows/seo-article-rewriting/context_files'),
   ];
 
@@ -127,6 +127,20 @@ async function configureForIDE(ide, projectRoot, config, logger) {
       break;
     }
   }
+}
+
+/**
+ * Resolve configuration paths that may contain {project-root} placeholders
+ * @private
+ * @param {string} projectRoot
+ * @param {string} value
+ * @returns {string}
+ */
+function resolveConfigPath(projectRoot, value) {
+  if (!value || typeof value !== 'string') return value;
+  return value
+    .replace(/{project-root}/g, projectRoot)
+    .replace(/{project_root}/g, projectRoot);
 }
 
 module.exports = { install };
