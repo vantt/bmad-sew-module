@@ -1,7 +1,28 @@
 name: scrape-url
-description: Scrapes a URL with FireCrawl to capture raw Markdown without rewriting. Supports optional domain-specific prompts.
-type: cli
-command: "firecrawl scrape {{url}} {{prompt_flag}}"
+description: |
+  Scrapes a URL with FireCrawl MCP to capture raw Markdown without rewriting.
+  Supports optional domain-specific prompts via extraction instructions.
+
+  PREFERRED: Use Firecrawl MCP tool (mcp__firecrawl__*)
+  FALLBACK: Use Firecrawl CLI if MCP not available
+
+type: mcp-or-cli
+mcp_tool_name: "mcp__firecrawl__scrape"  # or check available MCP tools
+cli_command: "firecrawl scrape {{url}} {{prompt_flag}}"
 output_format: markdown
-env_vars:
+
+# MCP parameters (when using MCP)
+mcp_parameters:
+  url: "{{url}}"
+  formats: ["markdown"]
+  # prompt parameter for extraction instructions
+  prompt: "{{extraction_prompt}}"  # optional, domain-specific instruction
+
+# CLI parameters (fallback)
+cli_env_vars:
   - FIRECRAWL_API_KEY
+
+notes: |
+  - MCP is preferred as it's more reliable and supports better parameter handling
+  - The 'prompt' parameter in MCP corresponds to extraction instructions
+  - If MCP not configured, falls back to CLI command

@@ -1,6 +1,13 @@
 <task id="bmad/sew/tasks/fetch-and-save-content.task.xml" name="Fetch and Save Content">
   <objective>Trích xuất nguyên bản nội dung từ URL và lưu vào Markdown mà không dịch, không viết lại, không tóm tắt.</objective>
 
+  <llm critical="true">
+    <mandate>YOU MUST READ {project-root}/bmad/sew/tools/firecrawl-prompts.yaml using Read tool BEFORE executing step 3</mandate>
+    <mandate>Parse the YAML content to extract domain-specific prompt matching the URL's domain</mandate>
+    <mandate>If no domain match found, use the "default" key value from YAML</mandate>
+    <mandate>The prompt from YAML must be passed to scrape-url tool via --prompt flag</mandate>
+  </llm>
+
   <parameters>
     <param name="url" type="string" required="true">Đường dẫn bài viết cần trích xuất.</param>
     <param name="output_file" type="string" required="false">Đường dẫn file output (mặc định: {sessions_output_folder}/fetched-content-{timestamp}.md).</param>
@@ -22,32 +29,95 @@
       <action>Store output path as {{final_output_path}}</action>
     </step>
 
-    <step n="2" goal="Chuẩn bị hướng dẫn trích xuất theo domain">
+    <step n="2" goal="Load và chọn domain-specific prompt từ firecrawl-prompts.yaml">
       <critical>Phải giữ nguyên ngôn ngữ và nội dung gốc. Tuyệt đối không viết lại, không dịch, không tóm tắt.</critical>
-      <action>Phân tích domain từ {{url}} (ví dụ: example.com).</action>
-      <action>Nếu tồn tại file {project-root}/bmad/sew/tools/firecrawl-prompts.yaml, đọc toàn bộ để lấy hướng dẫn tùy domain.</action>
-      <action>
-        Logic chọn prompt:
-        - Ưu tiên khớp chính xác domain (ví dụ: example.com).
-        - Nếu không có, tìm khóa wildcard như "*" hoặc "default".
-        - Nếu vẫn không có, để trống.
+
+      <action>Extract domain từ {{url}}:
+        - Ví dụ: https://healthinaging.org/article/123 → domain = "healthinaging.org"
+        - Ví dụ: https://www.example.com/blog/post → domain = "example.com" (bỏ www.)
+        - Lưu vào {{extracted_domain}}
       </action>
-      <action>Đặt {{firecrawl_prompt}} bằng hướng dẫn tìm được (có thể là chuỗi rỗng).</action>
-      <action>
-        Nếu {{firecrawl_prompt}} không rỗng, set {{firecrawl_prompt_flag}} = --prompt "{{firecrawl_prompt}}".
-        Nếu rỗng, set {{firecrawl_prompt_flag}} = "" để dùng chế độ chuẩn của FireCrawl.
+
+      <action critical="true">
+        USE Read tool to load {project-root}/bmad/sew/tools/firecrawl-prompts.yaml
+        - This step is MANDATORY, not optional
+        - Store the YAML content for parsing
       </action>
-      <action>Ghi log domain và loại prompt đang sử dụng để tiện truy vết.</action>
+
+      <action>Parse YAML content to find matching prompt:
+        STEP 1: Look for exact domain match (e.g., "healthinaging.org")
+        STEP 2: If not found, look for "default" key
+        STEP 3: If "default" not found or empty, use empty string ""
+
+        Example YAML structure:
+        ```yaml
+        default: ""
+        healthinaging.org: |
+          Instruction for this domain...
+        ```
+
+        Store matched value in {{firecrawl_prompt}}
+      </action>
+
+      <action>Construct the prompt flag for scrape-url command:
+        IF {{firecrawl_prompt}} is not empty:
+          {{prompt_flag}} = --prompt "{{firecrawl_prompt}}"
+        ELSE:
+          {{prompt_flag}} = "" (empty string, no flag)
+      </action>
+
+      <action>Log for debugging:
+        - "Domain extracted: {{extracted_domain}}"
+        - "Prompt found: {{firecrawl_prompt}}" (show first 100 chars if long)
+        - "Using flag: {{prompt_flag}}"
+      </action>
     </step>
 
-    <step n="3" goal="Trích xuất nội dung gốc bằng FireCrawl">
-      <action>Sử dụng tool scrape-url để lấy toàn bộ nội dung gốc dưới dạng Markdown.</action>
-      <invoke-tool
-          name="scrape-url"
-          url="{{url}}"
-          prompt_flag="{{firecrawl_prompt_flag}}"
-          output_variable="raw_content"
-      />
+    <step n="3" goal="Trích xuất nội dung gốc bằng FireCrawl MCP">
+      <action>Execute Firecrawl scraping via MCP (preferred) or CLI (fallback).</action>
+
+      <action critical="true">
+        OPTION A - Use Firecrawl MCP (PREFERRED):
+
+        Check if Firecrawl MCP tool is available (tool name patterns: mcp__firecrawl__scrape, mcp_firecrawl_scrape, or similar).
+
+        IF MCP tool is available:
+          Call the MCP tool directly with parameters:
+          - url: {{url}}
+          - formats: ["markdown"]
+          - prompt: {{firecrawl_prompt}} (if not empty, this is the extraction instruction)
+
+          Example call structure:
+          ```
+          Tool: mcp__firecrawl__scrape
+          Parameters:
+            url: "https://healthinaging.org/article/123"
+            formats: ["markdown"]
+            prompt: "Mỗi menu item bên trong Left Sidebar..."  (if domain has instruction)
+          ```
+
+          Store result as {{raw_content}}
+      </action>
+
+      <action>
+        OPTION B - Fallback to CLI (if MCP not available):
+
+        Use Bash tool to run firecrawl CLI command:
+        - Construct prompt flag: {{prompt_flag}} = --prompt "{{firecrawl_prompt}}" if prompt not empty, else ""
+        - Execute: firecrawl scrape {{url}} {{prompt_flag}}
+        - Store output as {{raw_content}}
+
+        Note: This requires FIRECRAWL_API_KEY environment variable
+      </action>
+
+      <action>
+        Log which method was used:
+        - "Using Firecrawl MCP tool" OR "Fallback to Firecrawl CLI"
+        - Include URL and whether prompt was applied
+      </action>
+
+      <note>MCP is strongly preferred as it handles parameters better and is more reliable than CLI</note>
+      <note>The scrape-url tool definition is in {project-root}/bmad/sew/tools/scrape-url.tool.yaml</note>
     </step>
 
     <step n="4" goal="Kiểm tra và làm sạch Markdown">
@@ -104,6 +174,19 @@
 
   <notes>
     <note>firecrawl-cli cần được cài đặt và cấu hình FIRECRAWL_API_KEY.</note>
-    <note>Tệp firecrawl-prompts.yaml cho phép override prompt theo domain.</note>
+    <note>Domain-specific prompts: {project-root}/bmad/sew/tools/firecrawl-prompts.yaml
+      - Format: YAML với keys là domain names (e.g., "healthinaging.org")
+      - Mỗi domain có thể có instruction riêng về cách extract content
+      - Key "default" sẽ được dùng nếu không có domain match
+      - Nếu "default" cũng rỗng, firecrawl sẽ chạy ở chế độ chuẩn (auto-extract)
+    </note>
+    <note>Để thêm instruction cho domain mới, edit firecrawl-prompts.yaml:
+      ```yaml
+      domain.com: |
+        Your extraction instruction here.
+        Can be multiline.
+      ```
+    </note>
+    <note>The Read tool MUST be used to load prompts file - this is enforced by mandate at task level.</note>
   </notes>
 </task>

@@ -1,4 +1,6 @@
 default: ""
 # Example:
-# example.com: |
-#   Extract the full article body in Vietnamese without rewriting. Preserve headings and lists.
+healthinaging.org: |
+   Mỗi menu item bên trong Left Sidbar là link tới 1 sub-section trong bài viết. Không phải là một bài riêng. 
+   Khi bóc tách, cần nối nội dung của trang chính với tất cả nội dung từ các trang ở menu item trong Left Sidebar
+
