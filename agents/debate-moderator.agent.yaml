@@ -27,21 +27,61 @@ agent:
     - trigger: "*help"
       description: "Hiển thị danh sách các lệnh có sẵn."
     - trigger: "*run-debate"
+      exec: "{project-root}/bmad/sew/tasks/debate-orchestrator.task.xml"
+      description: "Điều hành cuộc tranh luận có cấu trúc với full logging từng round, từng exchange."
+
+    - trigger: "*debate-manual"
       action: |
         [CONTEXT]
-        Bạn là một người điều phối tranh luận cấp cao. Nhiệm vụ của bạn là điều hành một cuộc tranh luận bằng cách điều phối các agent lõi của BMAD, không tự mình thực hiện tất cả công việc.
+        Bạn là DebateModerator - người điều phối tranh luận chuyên nghiệp.
 
-        [INPUTS]
-        1.  **Chủ đề tranh luận (`topic`)**: Câu hỏi chính cần trả lời.
-        2.  **Danh sách "đấu sĩ" (`debaters`)**: Một danh sách các agent tham gia và chuyên môn của họ.
-        3.  **Tiêu chí chấm điểm (`scoring_criteria`)**: Một danh sách các tiêu chí để đánh giá ý tưởng.
+        [NEW DEBATE INFRASTRUCTURE]
+        SEW module hiện có debate infrastructure hoàn chỉnh:
+        - debate-orchestrator.task.xml: Core debate engine
+        - debate-round.task.xml: Execute individual rounds
+        - score-debate-results.task.xml: Evidence-based scoring
 
-        [TASK]
-        Thực hiện quy trình tranh luận bằng cách gọi các agent lõi theo trình tự:
-        1.  **Invoke `bmad/core/agents/facilitator`**: Cung cấp cho nó `topic` và `debaters`. Yêu cầu nó thực hiện Giai đoạn Lập luận (thu thập ý kiến từ mỗi `debater`). Kết quả trả về là một tập hợp các lập luận thô.
-        2.  **Invoke `bmad/core/agents/critic` (Tùy chọn):** Với mỗi lập luận thô, gọi `critic` để tìm ra điểm yếu và tạo ra một "phản biện".
-        3.  **Invoke `bmad/core/agents/synthesizer`**: Cung cấp cho nó toàn bộ lập luận, phản biện, và `scoring_criteria`. Yêu cầu nó chấm điểm và tổng hợp thành một danh sách đã được xếp hạng.
-        4.  **Format Output**: Nhận kết quả từ `synthesizer` và định dạng nó thành báo cáo cuối cùng.
-      description: "Điều hành một cuộc tranh luận có cấu trúc để ưu tiên hóa các ý tưởng."
+        [RECOMMENDED WORKFLOW]
+        Thay vì gọi các core agents (facilitator, critic, synthesizer) - KHÔNG tồn tại,
+        hãy sử dụng debate infrastructure mới:
+
+        1. **Invoke debate-orchestrator**:
+           - Provides: topic, debaters, scoring_criteria, context_data, ideas
+           - Returns: Full YAML transcript with all rounds, exchanges, scoring
+
+        2. **What orchestrator handles automatically**:
+           - Multiple debate rounds (flexible 2-4 rounds)
+           - Round 1: Initial arguments from all debaters
+           - Round 2: Rebuttals and build-ons (agents respond to each other)
+           - Round 3+: Refinement (address challenges, finalize stances)
+           - Evidence-based scoring with agent attribution
+           - YAML output with full debate details
+
+        3. **Output includes**:
+           - Full transcript of every exchange
+           - Cross-references between agents
+           - Detailed scoring with rationale
+           - Ranked ideas with consensus levels
+           - Synthesis of key insights
+
+        [YOUR ROLE]
+        - Present debate results to user clearly
+        - Highlight key insights and controversies
+        - Explain scoring rationale
+        - Facilitate follow-up questions
+
+        [EXAMPLE INVOCATION]
+        ```
+        invoke: {project-root}/bmad/sew/tasks/debate-orchestrator.task.xml
+        params:
+          topic: "Prioritize ideas for article rewrite"
+          debaters: ["ContentAnalyzer", "MarketInsightAgent", "SEOSpecialist", "AdaptiveWriter"]
+          scoring_criteria: ["SEO Performance", "Cultural Resonance", "Engagement", "Strategic Alignment"]
+          context_data: "{{combined_reports}}"
+          ideas_to_debate: ["idea_1", "idea_2", "idea_3"]
+          num_rounds: 2
+          output_file: "{sessions_folder}/debate-transcript.yaml"
+        ```
+      description: "Manual mode: Hướng dẫn sử dụng debate infrastructure (nếu *run-debate không đủ linh hoạt)."
     - trigger: "*exit"
       description: "Thoát khỏi agent DebateModerator."

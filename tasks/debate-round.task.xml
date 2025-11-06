@@ -1,0 +1,205 @@
+<task id="bmad/sew/tasks/debate-round.task.xml" name="Debate Round">
+  <objective>Thực thi một round tranh luận với full logging của tất cả exchanges giữa các agents.</objective>
+
+  <llm critical="true">
+    <mandate>Every agent MUST provide their full argument/rebuttal, not summaries</mandate>
+    <mandate>Capture exact agent perspectives in their authentic voice</mandate>
+    <mandate>Log cross-references when agents respond to each other</mandate>
+    <mandate>Each exchange must include: agent, full text, key points, references</mandate>
+  </llm>
+
+  <parameters>
+    <param name="round_number" type="number" required="true">Số thứ tự round.</param>
+    <param name="round_type" type="string" required="true">Loại round: "initial_arguments", "rebuttals_and_builds", "refinement".</param>
+    <param name="debaters" type="array" required="true">Danh sách agents tham gia.</param>
+    <param name="ideas" type="array" required="true">Ideas đang được debate.</param>
+    <param name="context" type="string" required="true">Context data cho round.</param>
+    <param name="previous_rounds" type="array" required="false">Các rounds trước (cho rounds 2+).</param>
+  </parameters>
+
+  <output>
+    <param name="round_result" type="object">Round data với tất cả exchanges.</param>
+  </output>
+
+  <flow>
+    <step n="1" goal="Announce round and set expectations">
+      <action>Display round header:
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        "🔄 Round {{round_number}}: {{round_type}}"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      </action>
+
+      <action>Set expectations based on round_type:
+        IF "initial_arguments":
+          "Each agent will present their analysis and position on the ideas."
+
+        IF "rebuttals_and_builds":
+          "Agents will respond to each other's arguments, challenge weak points, and build on strong ones."
+
+        IF "refinement":
+          "Agents will refine their positions based on feedback and address remaining concerns."
+      </action>
+    </step>
+
+    <step n="2" goal="Execute exchanges based on round type">
+      <action>Initialize exchanges array: []</action>
+
+      <check if="round_type == 'initial_arguments'">
+        <action>For each agent in {{debaters}} (in order):
+          1. Present the context and ideas to the agent
+          2. Ask agent (in their authentic voice/expertise) to:
+             - Analyze each idea from their perspective
+             - Rank ideas based on their domain expertise
+             - Provide detailed rationale for rankings
+             - Highlight strengths and concerns
+
+          3. Capture full response as exchange:
+             ```yaml
+             - agent: "{{agent_name}}"
+               agent_role: "{{agent's domain}}"
+               argument: |
+                 Full multiline text of agent's argument.
+                 Preserving all details, analysis, and reasoning.
+               key_points:
+                 - "Key point 1 from their argument"
+                 - "Key point 2..."
+               ideas_assessment:
+                 - idea_id: "idea_1"
+                   stance: "strongly_support / support / neutral / concern / oppose"
+                   reason: "Why they hold this stance"
+                 - idea_id: "idea_2"
+                   ...
+             ```
+
+          4. Append exchange to exchanges[]
+
+          5. Display to user:
+             "🗣️ {{agent_name}} ({{role}}):"
+             "{{summary of their argument - 2-3 sentences}}"
+        </action>
+      </check>
+
+      <check if="round_type == 'rebuttals_and_builds'">
+        <action>Load previous_rounds to give agents context</action>
+
+        <action>For each agent in {{debaters}}:
+          1. Show them previous round's exchanges from ALL agents
+          2. Ask agent to:
+             - Identify points they agree/disagree with from other agents
+             - Challenge weak arguments they heard
+             - Build on strong points that align with their view
+             - Clarify any misunderstandings about their previous stance
+
+          3. Capture response with cross-references:
+             ```yaml
+             - agent: "{{agent_name}}"
+               responds_to:
+                 - agent: "OtherAgent"
+                   point: "Specific point being responded to"
+                   response_type: "agreement / disagreement / clarification / build_on"
+                   response: "Full response text"
+               challenges:
+                 - agent: "AgentName"
+                   challenge: "What they're challenging and why"
+               builds_on:
+                 - agent: "AgentName"
+                   builds_on: "What they're building on and how"
+               refined_position: |
+                 Updated stance after hearing others
+               key_points:
+                 - "Refined point 1"
+                 - "Refined point 2"
+             ```
+
+          4. Append to exchanges[]
+          5. Display interactive exchange summary to user
+        </action>
+      </check>
+
+      <check if="round_type == 'refinement'">
+        <action>For each agent:
+          1. Present summary of contentious points from previous rounds
+          2. Ask agent to:
+             - Address specific challenges raised against their views
+             - Refine their position with additional evidence/reasoning
+             - Offer compromise or alternative solutions if applicable
+             - State final stance on each idea
+
+          3. Capture final refinement:
+             ```yaml
+             - agent: "{{agent_name}}"
+               addresses_challenges:
+                 - challenge: "Specific challenge from another agent"
+                   response: "How they address it"
+               refined_position: |
+                 Final refined stance
+               final_stances:
+                 - idea_id: "idea_1"
+                   final_stance: "support / oppose / conditional_support"
+                   conditions: "If conditional, what conditions"
+                   confidence: "high / medium / low"
+               key_points:
+                 - "Final key point 1"
+             ```
+        </action>
+      </check>
+    </step>
+
+    <step n="3" goal="Capture round dynamics">
+      <action>Analyze the exchanges to identify:
+        - Consensus areas (what agents agreed on)
+        - Disagreement areas (where they split)
+        - Emerging themes (patterns across arguments)
+        - Strong arguments (well-supported points)
+        - Weak arguments (challenged by multiple agents)
+      </action>
+
+      <action>Store dynamics:
+        ```yaml
+        round_dynamics:
+          consensus_areas:
+            - "Area of agreement 1"
+          disagreements:
+            - topic: "What they disagreed on"
+              positions:
+                - agent: "AgentA"
+                  position: "Their stance"
+                - agent: "AgentB"
+                  position: "Their opposing stance"
+          emerging_themes:
+            - "Theme identified across multiple arguments"
+          notable_moments:
+            - "Significant exchange or revelation"
+        ```
+      </action>
+    </step>
+
+    <step n="4" goal="Compile round result">
+      <action>Create round_result object:
+        ```yaml
+        round_number: {{round_number}}
+        round_type: {{round_type}}
+        timestamp: {current_timestamp}
+        exchanges: {{exchanges}}
+        round_dynamics: {{round_dynamics}}
+        exchange_count: {{exchanges.length}}
+        round_summary: |
+          Brief summary of what happened in this round.
+          Key developments, major agreements/disagreements.
+        ```
+      </action>
+
+      <output>
+        <param name="round_result" type="object">{{round_result}}</param>
+      </output>
+    </step>
+  </flow>
+
+  <notes>
+    <note>This task is invoked by debate-orchestrator.task.xml for each round</note>
+    <note>Agents should speak in their authentic voice based on their agent definitions</note>
+    <note>Full argument capture is critical - no summarization here, save full text</note>
+    <note>Cross-references between agents make the debate transcript navigable</note>
+    <note>Round dynamics help understand debate flow beyond just individual statements</note>
+  </notes>
+</task>

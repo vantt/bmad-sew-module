@@ -1,55 +1,122 @@
 <task id="bmad/sew/tasks/outline-debate.task.xml" name="Outline Debate">
-  <objective>Điều hành một cuộc tranh luận giữa các agent chuyên gia để tạo ra một dàn ý bài viết có cấu trúc, chuẩn SEO.</objective>
+  <objective>Điều hành một cuộc tranh luận giữa các agent chuyên gia để tạo ra một dàn ý bài viết có cấu trúc, chuẩn SEO với full logging.</objective>
 
   <parameters>
     <param name="topic" type="string" required="true">Chủ đề chính của cuộc tranh luận (ví dụ: "Xây dựng dàn ý cho bài viết mới").</param>
-    <param name="approved_ideas" type="string" required="true">Danh sách các ý tưởng đã được phê duyệt để xây dựng dàn ý.</param>
-    <param name="output_file" type="string" required="false">Đường dẫn file để lưu kết quả tranh luận dàn ý (YAML). Nếu không cung cấp, chỉ trả về kết quả trong bộ nhớ.</param>
+    <param name="approved_ideas" type="string" required="true">Danh sách các ý tưởng đã được phê duyệt để làm cơ sở cho dàn ý.</param>
+    <param name="outline_options" type="array" required="true">Danh sách các outline options/structures để debate.</param>
+    <param name="num_rounds" type="number" required="false">Số rounds tranh luận (mặc định: 2).</param>
+    <param name="output_file" type="string" required="false">Đường dẫn file để lưu full debate transcript (YAML).</param>
   </parameters>
 
   <output>
-    <param name="curated_outline" type="string">Dàn ý đã được xếp hạng và ưu tiên hóa.</param>
-    <param name="debate_summary" type="string">Tóm tắt quá trình tranh luận.</param>
+    <param name="debate_transcript" type="yaml">Full debate transcript với tất cả rounds và exchanges.</param>
+    <param name="ranked_outlines" type="array">Outline options đã được xếp hạng theo điểm số.</param>
+    <param name="synthesis" type="object">Tổng hợp insights từ debate.</param>
   </output>
 
   <flow>
-    <step n="1" goal="Gọi agent DebateModerator để điều hành tranh luận về dàn ý">
-      <action>
-        Gọi agent `DebateModerator` để điều hành cuộc tranh luận về việc xây dựng dàn ý.
+    <step n="1" goal="Chuẩn bị context và outline options">
+      <action>Format context data:
+        ```
+        === Approved Ideas ===
+        {{approved_ideas}}
+
+        These approved ideas should inform the outline structure.
+        Each outline option will be evaluated on how well it incorporates these ideas.
+        ```
       </action>
-      <invoke-task
-          exec="bmad/core/tasks/invoke-agent.xml"
-          agent_id="bmad/sew/agents/debate-moderator.agent.yaml"
-          command="*run-debate --topic '{{topic}}' --debaters 'ContentAnalyzer, MarketInsightAgent, SEOSpecialist, AdaptiveWriter' --scoring_criteria 'Logical Flow, SEO Keyword Distribution, Cultural Flow, Hook Effectiveness' --context_data '{{approved_ideas}}'"
-          output_variable="debate_results"
-      />
+
+      <action>Set default {{num_rounds}} = 2 if not provided</action>
+
+      <action>Validate {{outline_options}}:
+        - Must have at least 2 outline structures to compare
+        - Each outline should have: id, title, structure/sections
+      </action>
+
+      <action>Log initiation:
+        "🎯 Starting Outline Debate"
+        "📋 Topic: {{topic}}"
+        "📝 Outline options: {{outline_options.length}}"
+        "🔄 Rounds planned: {{num_rounds}}"
+      </action>
     </step>
 
-    <step n="2" goal="Trích xuất dàn ý đã chọn lọc và tóm tắt tranh luận">
-      <action>
-        Trích xuất `ranked_ideas` (trong trường hợp này là dàn ý) và `debate_summary` từ `debate_results`.
+    <step n="2" goal="Invoke debate orchestrator with outline-specific criteria">
+      <action critical="true">
+        Execute debate-orchestrator.task.xml:
+        ```
+        exec: {project-root}/bmad/sew/tasks/debate-orchestrator.task.xml
+        parameters:
+          topic: {{topic}}
+          debaters: ["ContentAnalyzer", "MarketInsightAgent", "SEOSpecialist", "AdaptiveWriter"]
+          scoring_criteria: ["Logical Flow", "SEO Keyword Distribution", "Cultural Flow", "Hook Effectiveness", "Readability"]
+          context_data: {{formatted_context}}
+          ideas_to_debate: {{outline_options}}
+          num_rounds: {{num_rounds}}
+          output_file: {{output_file}}
+        output_variable: orchestrator_results
+        ```
       </action>
+
+      <note>Outline debate criteria differ from ideas debate:
+        - Logical Flow: Does structure make sense? Natural progression?
+        - SEO Keyword Distribution: Keywords spread effectively across sections?
+        - Cultural Flow: Does structure resonate with target culture?
+        - Hook Effectiveness: Does opening grab attention?
+        - Readability: Is structure easy to scan and navigate?
+      </note>
+    </step>
+
+    <step n="3" goal="Extract and present results">
+      <action>Extract from orchestrator_results:
+        - debate_transcript (full YAML)
+        - ranked_outlines (sorted by score)
+        - synthesis (key insights)
+      </action>
+
+      <action>Display summary to user:
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        "✅ OUTLINE DEBATE COMPLETE"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ""
+        "🏆 Top Ranked Outline Structures:"
+        For each outline in ranked_outlines (top 3):
+          "{{rank}}. {{title}}"
+          "   Score: {{total_score}}/{{max}} ({{percentage}}%)"
+          "   Consensus: {{consensus_level}}"
+          "   Best Criterion: {{top_criterion}}: {{top_score}}"
+          "   Structure: {{section_count}} sections"
+        ""
+        "💡 Key Insights:"
+        For each insight in synthesis.key_insights:
+          "- {{insight}}"
+        ""
+        "🎯 Recommendations:"
+        IF top outline has high consensus:
+          "Strong consensus on #1 outline - proceed with confidence"
+        ELSE:
+          "Consider hybrid approach combining strengths from multiple outlines"
+        ""
+        IF output_file:
+          "📄 Full transcript saved: {{output_file}}"
+      </action>
+    </step>
+
+    <step n="4" goal="Return structured output">
       <output>
-        <param name="curated_outline" type="string">{{debate_results.ranked_ideas}}</param>
-        <param name="debate_summary" type="string">{{debate_results.debate_summary}}</param>
+        <param name="debate_transcript" type="yaml">{{orchestrator_results.debate_transcript}}</param>
+        <param name="ranked_outlines" type="array">{{orchestrator_results.ranked_ideas}}</param>
+        <param name="synthesis" type="object">{{orchestrator_results.synthesis}}</param>
       </output>
     </step>
-
-    <step n="3" goal="Lưu kết quả vào file nếu output_file được cung cấp">
-      <check if="{{output_file}} is not empty">
-        <action>
-          Tạo thư mục cha của {{output_file}} nếu chưa tồn tại.
-        </action>
-        <action>
-          Tổng hợp nội dung YAML: curated_outline + debate_summary
-        </action>
-        <action>
-          Ghi nội dung vào file {{output_file}}.
-        </action>
-        <action>
-          Hiển thị: "✓ Saved: {{output_file}}"
-        </action>
-      </check>
-    </step>
   </flow>
+
+  <notes>
+    <note>This task uses debate-orchestrator.task.xml with outline-specific criteria</note>
+    <note>Outline debate focuses on structure, flow, and SEO distribution</note>
+    <note>Full transcript captures agent reasoning about structure choices</note>
+    <note>Scoring helps identify strongest outline or opportunities for hybrid approach</note>
+    <note>Compatible with human approval gate in main workflow</note>
+  </notes>
 </task>

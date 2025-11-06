@@ -1,58 +1,124 @@
 <task id="bmad/sew/tasks/ideas-debate.task.xml" name="Ideas Debate">
-  <objective>Điều hành một cuộc tranh luận giữa các agent chuyên gia để ưu tiên hóa các ý tưởng cho bài viết mới.</objective>
+  <objective>Điều hành một cuộc tranh luận giữa các agent chuyên gia để ưu tiên hóa các ý tưởng cho bài viết mới với full logging từng round.</objective>
 
   <parameters>
     <param name="topic" type="string" required="true">Chủ đề chính của cuộc tranh luận (ví dụ: "Các ý tưởng cho bài viết mới").</param>
+    <param name="ideas_list" type="array" required="true">Danh sách các ideas cần debate và xếp hạng.</param>
     <param name="content_analysis_report" type="string" required="true">Báo cáo phân tích nội dung từ ContentAnalyzer.</param>
     <param name="market_insight_report" type="string" required="true">Báo cáo insight thị trường từ MarketInsightAgent.</param>
-    <param name="seo_preliminary_analysis" type="string" required="true">Phân tích SEO sơ bộ từ SEOSpecialist (nếu có).</param>
-    <param name="cultural_context" type="string" required="true">Ngữ cảnh văn hóa từ các tệp hỗ trợ.</param>
-    <param name="output_file" type="string" required="false">Đường dẫn file để lưu kết quả tranh luận ý tưởng (YAML). Nếu không cung cấp, chỉ trả về kết quả trong bộ nhớ.</param>
+    <param name="seo_preliminary_analysis" type="string" required="false">Phân tích SEO sơ bộ từ SEOSpecialist (nếu có).</param>
+    <param name="cultural_context" type="string" required="false">Ngữ cảnh văn hóa từ các tệp hỗ trợ.</param>
+    <param name="num_rounds" type="number" required="false">Số rounds tranh luận (mặc định: 2).</param>
+    <param name="output_file" type="string" required="false">Đường dẫn file để lưu full debate transcript (YAML).</param>
   </parameters>
 
   <output>
-    <param name="curated_ideas" type="string">Danh sách các ý tưởng đã được xếp hạng và ưu tiên hóa.</param>
-    <param name="debate_summary" type="string">Tóm tắt quá trình tranh luận.</param>
+    <param name="debate_transcript" type="yaml">Full debate transcript với tất cả rounds và exchanges.</param>
+    <param name="ranked_ideas" type="array">Ideas đã được xếp hạng theo điểm số.</param>
+    <param name="synthesis" type="object">Tổng hợp insights từ debate.</param>
   </output>
 
   <flow>
-    <step n="1" goal="Gọi agent DebateModerator để điều hành tranh luận ý tưởng">
-      <action>
-        Gọi agent `DebateModerator` để điều hành cuộc tranh luận về các ý tưởng cho bài viết mới.
+    <step n="1" goal="Chuẩn bị context data và ideas">
+      <action>Combine all context reports into one context_data string:
+        ```
+        === Content Analysis ===
+        {{content_analysis_report}}
+
+        === Market Insights ===
+        {{market_insight_report}}
+
+        === SEO Analysis ===
+        {{seo_preliminary_analysis}}
+
+        === Cultural Context ===
+        {{cultural_context}}
+        ```
       </action>
-      <invoke-task
-          exec="bmad/core/tasks/invoke-agent.xml"
-          agent_id="bmad/sew/agents/debate-moderator.agent.yaml"
-          command="*run-debate --topic '{{topic}}' --debaters 'ContentAnalyzer, MarketInsightAgent, SEOSpecialist, AdaptiveWriter' --scoring_criteria 'SEO Performance, Cultural Resonance, Engagement Potential, Strategic Alignment' --context_data '{{content_analysis_report}}, {{market_insight_report}}, {{seo_preliminary_analysis}}, {{cultural_context}}'"
-          output_variable="debate_results"
-      />
+
+      <action>Set default {{num_rounds}} = 3 if not provided</action>
+
+      <action>Validate {{ideas_list}}:
+        - Must have at least 3 ideas to debate
+        - Each idea should have: id, title, description
+      </action>
+
+      <action>Log initiation:
+        "🎯 Starting Ideas Debate"
+        "📋 Topic: {{topic}}"
+        "💡 Ideas to debate: {{ideas_list.length}}"
+        "🔄 Rounds planned: {{num_rounds}}"
+      </action>
     </step>
 
-    <step n="2" goal="Trích xuất ý tưởng đã chọn lọc và tóm tắt tranh luận">
-      <action>
-        Trích xuất `ranked_ideas` và `debate_summary` từ `debate_results`.
+    <step n="2" goal="Invoke debate orchestrator">
+      <action critical="true">
+        Execute debate-orchestrator.task.xml với parameters đầy đủ:
+        ```
+        exec: {project-root}/bmad/sew/tasks/debate-orchestrator.task.xml
+        parameters:
+          topic: {{topic}}
+          debaters: ["ContentAnalyzer", "MarketInsightAgent", "SEOSpecialist", "AdaptiveWriter"]
+          scoring_criteria: ["SEO Performance", "Cultural Resonance", "Engagement Potential", "Strategic Alignment"]
+          context_data: {{combined_context}}
+          ideas_to_debate: {{ideas_list}}
+          num_rounds: {{num_rounds}}
+          output_file: {{output_file}}
+        output_variable: orchestrator_results
+        ```
       </action>
+
+      <note>Orchestrator handles:
+        - All debate rounds with full exchanges
+        - Agent-to-agent dialogue
+        - Evidence-based scoring
+        - Synthesis of insights
+        - YAML output with complete transcript
+      </note>
+    </step>
+
+    <step n="3" goal="Extract and present results">
+      <action>Extract from orchestrator_results:
+        - debate_transcript (full YAML)
+        - ranked_ideas (sorted by score)
+        - synthesis (key insights)
+      </action>
+
+      <action>Display summary to user:
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        "✅ IDEAS DEBATE COMPLETE"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ""
+        "🏆 Top Ranked Ideas:"
+        For each idea in ranked_ideas (top 3):
+          "{{rank}}. {{title}}"
+          "   Score: {{total_score}}/{{max}} ({{percentage}}%)"
+          "   Consensus: {{consensus_level}}"
+          "   Key Strength: {{top_strength}}"
+        ""
+        "💡 Key Insights:"
+        For each insight in synthesis.key_insights:
+          "- {{insight}}"
+        ""
+        IF output_file:
+          "📄 Full transcript saved: {{output_file}}"
+      </action>
+    </step>
+
+    <step n="4" goal="Return structured output">
       <output>
-        <param name="curated_ideas" type="string">{{debate_results.ranked_ideas}}</param>
-        <param name="debate_summary" type="string">{{debate_results.debate_summary}}</param>
+        <param name="debate_transcript" type="yaml">{{orchestrator_results.debate_transcript}}</param>
+        <param name="ranked_ideas" type="array">{{orchestrator_results.ranked_ideas}}</param>
+        <param name="synthesis" type="object">{{orchestrator_results.synthesis}}</param>
       </output>
     </step>
-
-    <step n="3" goal="Lưu kết quả vào file nếu output_file được cung cấp">
-      <check if="{{output_file}} is not empty">
-        <action>
-          Tạo thư mục cha của {{output_file}} nếu chưa tồn tại.
-        </action>
-        <action>
-          Tổng hợp nội dung YAML: curated_ideas + debate_summary
-        </action>
-        <action>
-          Ghi nội dung vào file {{output_file}}.
-        </action>
-        <action>
-          Hiển thị: "✓ Saved: {{output_file}}"
-        </action>
-      </check>
-    </step>
   </flow>
+
+  <notes>
+    <note>This task now uses debate-orchestrator.task.xml infrastructure</note>
+    <note>Full debate details are captured in YAML transcript</note>
+    <note>All agent exchanges, rebuttals, and cross-references are logged</note>
+    <note>Scoring is evidence-based with agent attribution</note>
+    <note>Output is compatible with human approval gates in workflow</note>
+  </notes>
 </task>

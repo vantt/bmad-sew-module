@@ -1,0 +1,213 @@
+<task id="bmad/sew/tasks/debate-orchestrator.task.xml" name="Debate Orchestrator">
+  <objective>Điều phối một cuộc tranh luận có cấu trúc giữa nhiều agents với logging đầy đủ từng round, từng exchange.</objective>
+
+  <llm critical="true">
+    <mandate>LOG every exchange from every agent in every round - nothing should be lost</mandate>
+    <mandate>Maintain agent attribution for all arguments, rebuttals, and refinements</mandate>
+    <mandate>Output MUST be in YAML format with full debate transcript</mandate>
+    <mandate>Each round must capture: agent name, full argument text, key points, references to other agents</mandate>
+  </llm>
+
+  <parameters>
+    <param name="topic" type="string" required="true">Câu hỏi/chủ đề tranh luận chính.</param>
+    <param name="debaters" type="array" required="true">Danh sách agents tham gia (e.g., ["ContentAnalyzer", "MarketInsightAgent", "SEOSpecialist", "AdaptiveWriter"]).</param>
+    <param name="scoring_criteria" type="array" required="true">Các tiêu chí chấm điểm (e.g., ["SEO Performance", "Cultural Resonance"]).</param>
+    <param name="context_data" type="string" required="true">Dữ liệu ngữ cảnh cho debate (reports, analyses, etc.).</param>
+    <param name="num_rounds" type="number" required="false">Số rounds (mặc định: 2, flexible 2-4).</param>
+    <param name="ideas_to_debate" type="array" required="true">Danh sách các ideas/options cần tranh luận và xếp hạng.</param>
+    <param name="output_file" type="string" required="false">Đường dẫn lưu debate transcript (YAML).</param>
+  </parameters>
+
+  <output>
+    <param name="debate_transcript" type="yaml">Full debate transcript với tất cả rounds và exchanges.</param>
+    <param name="ranked_ideas" type="array">Ideas đã được xếp hạng theo điểm số.</param>
+    <param name="synthesis" type="object">Tổng hợp insights, consensus, controversies.</param>
+  </output>
+
+  <flow>
+    <step n="1" goal="Initialize debate structure">
+      <action>Set default {{num_rounds}} = 2 if not provided</action>
+      <action>Validate inputs:
+        - {{debaters}} must have at least 2 agents
+        - {{scoring_criteria}} must have at least 1 criterion
+        - {{ideas_to_debate}} must have at least 1 idea
+      </action>
+
+      <action>Initialize debate_transcript structure:
+        ```yaml
+        metadata:
+          topic: {{topic}}
+          debaters: {{debaters}}
+          scoring_criteria: {{scoring_criteria}}
+          timestamp: {current_timestamp}
+          total_rounds: {{num_rounds}}
+
+        rounds: []
+        scoring: []
+        final_ranking: []
+        synthesis: {}
+        ```
+      </action>
+
+      <action>Log opening:
+        "🎯 Debate Topic: {{topic}}"
+        "👥 Debaters: {{debaters}}"
+        "📊 Criteria: {{scoring_criteria}}"
+        "🔄 Rounds: {{num_rounds}}"
+      </action>
+    </step>
+
+    <step n="2" goal="Opening: Moderator presents context" optional="false">
+      <action>As DebateModerator, present:
+        1. The debate topic clearly
+        2. List of ideas/options to be debated
+        3. Scoring criteria explained
+        4. Context data summary (from {{context_data}})
+        5. Rules of engagement
+      </action>
+
+      <action>Store opening in transcript:
+        ```yaml
+        opening:
+          moderator_introduction: "Full text of opening remarks"
+          ideas_presented:
+            - id: "idea_1"
+              title: "..."
+              description: "..."
+            - id: "idea_2"
+              ...
+          context_summary: "Key points from context data"
+        ```
+      </action>
+    </step>
+
+    <step n="3" goal="Execute debate rounds" repeat="{{num_rounds}} times">
+      <action>For each round_number from 1 to {{num_rounds}}:</action>
+
+      <action>Determine round type:
+        - Round 1: "initial_arguments" (agents present positions)
+        - Round 2: "rebuttals_and_builds" (respond to each other)
+        - Round 3+: "refinement" (refine positions, address challenges)
+      </action>
+
+      <action critical="true">
+        Invoke debate-round.task.xml:
+        ```
+        exec: {project-root}/bmad/sew/tasks/debate-round.task.xml
+        parameters:
+          round_number: {{current_round}}
+          round_type: {{determined_round_type}}
+          debaters: {{debaters}}
+          ideas: {{ideas_to_debate}}
+          context: {{context_data}}
+          previous_rounds: {{rounds_so_far}} (for rounds 2+)
+        output_variable: round_result
+        ```
+      </action>
+
+      <action>Append {{round_result}} to debate_transcript.rounds[]</action>
+
+      <action>Display round summary to user:
+        "━━━ Round {{round_number}}: {{round_type}} ━━━"
+        For each exchange in round:
+          "🗣️ {{agent_name}}: {{summary_of_argument}}"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      </action>
+
+      <check if="round_number < num_rounds">
+        <ask>Continue to next round? [y/n]</ask>
+        <action if="user says no">Break loop, proceed to scoring</action>
+      </check>
+    </step>
+
+    <step n="4" goal="Scoring and ranking">
+      <action critical="true">
+        Invoke score-debate-results.task.xml:
+        ```
+        exec: {project-root}/bmad/sew/tasks/score-debate-results.task.xml
+        parameters:
+          debate_transcript: {{debate_transcript}}
+          ideas: {{ideas_to_debate}}
+          criteria: {{scoring_criteria}}
+          debaters: {{debaters}}
+        output_variable: scoring_results
+        ```
+      </action>
+
+      <action>Store scoring_results in debate_transcript:
+        - debate_transcript.scoring = {{scoring_results.detailed_scores}}
+        - debate_transcript.final_ranking = {{scoring_results.ranked_ideas}}
+      </action>
+
+      <action>Display ranking to user:
+        "📊 FINAL RANKING 📊"
+        For each ranked_idea:
+          "{{rank}}. {{idea_title}} - Score: {{total_score}}/{{max_possible}}"
+          "   Breakdown: SEO={{score}}, Cultural={{score}}, ..."
+      </action>
+    </step>
+
+    <step n="5" goal="Synthesize insights">
+      <action>As DebateModerator, analyze full debate transcript to extract:
+        1. Key insights (what all agents agreed on)
+        2. Controversial points (what was debated heavily)
+        3. Unanimous support (ideas with strong consensus)
+        4. Split decisions (ideas with divided opinions)
+        5. Surprising revelations (unexpected points raised)
+      </action>
+
+      <action>Store synthesis in debate_transcript.synthesis:
+        ```yaml
+        synthesis:
+          key_insights:
+            - "Insight 1 from debate"
+            - "Insight 2..."
+          controversial_points:
+            - point: "Controversial issue"
+              debaters_for: ["Agent1", "Agent2"]
+              debaters_against: ["Agent3"]
+          unanimous_support:
+            - idea: "idea_1"
+              reason: "All agents praised..."
+          split_decisions:
+            - idea: "idea_3"
+              split_reason: "SEO strong but cultural fit weak"
+          surprising_revelations:
+            - "Unexpected connection discovered by Agent..."
+        ```
+      </action>
+
+      <action>Display synthesis summary to user</action>
+    </step>
+
+    <step n="6" goal="Save full transcript to file">
+      <check if="{{output_file}} is provided">
+        <action>Ensure parent directory exists</action>
+        <action>Write {{debate_transcript}} to {{output_file}} in YAML format with proper formatting:
+          - Use | for multiline strings
+          - Proper indentation (2 spaces)
+          - Include comments for readability
+        </action>
+        <action>Display: "✅ Full debate transcript saved: {{output_file}}"</action>
+        <action>Display file size and number of exchanges captured</action>
+      </check>
+    </step>
+
+    <step n="7" goal="Return results">
+      <output>
+        <param name="debate_transcript" type="yaml">{{debate_transcript}}</param>
+        <param name="ranked_ideas" type="array">{{debate_transcript.final_ranking}}</param>
+        <param name="synthesis" type="object">{{debate_transcript.synthesis}}</param>
+      </output>
+    </step>
+  </flow>
+
+  <notes>
+    <note>This is the core debate engine - invoked by ideas-debate and outline-debate tasks</note>
+    <note>Full transcript includes every exchange, making debates auditable and analyzable</note>
+    <note>Flexible rounds allow short debates (2 rounds) or deep debates (4+ rounds)</note>
+    <note>YAML format enables easy parsing and further processing</note>
+    <note>The debate-round.task.xml handles individual round execution</note>
+    <note>The score-debate-results.task.xml handles scoring logic</note>
+  </notes>
+</task>

@@ -1,0 +1,196 @@
+<task id="bmad/sew/tasks/score-debate-results.task.xml" name="Score Debate Results">
+  <objective>Chấm điểm và xếp hạng các ideas dựa trên toàn bộ debate transcript theo các tiêu chí đã định.</objective>
+
+  <llm critical="true">
+    <mandate>Scoring MUST be based on evidence from debate transcript</mandate>
+    <mandate>Each score must reference specific arguments from specific agents</mandate>
+    <mandate>Provide detailed rationale for each score, not just numbers</mandate>
+    <mandate>Track which agents supported/opposed each idea</mandate>
+  </llm>
+
+  <parameters>
+    <param name="debate_transcript" type="object" required="true">Full debate transcript với tất cả rounds.</param>
+    <param name="ideas" type="array" required="true">Ideas cần chấm điểm.</param>
+    <param name="criteria" type="array" required="true">Scoring criteria (e.g., ["SEO Performance", "Cultural Resonance"]).</param>
+    <param name="debaters" type="array" required="true">Danh sách agents đã tham gia.</param>
+  </parameters>
+
+  <output>
+    <param name="detailed_scores" type="array">Chi tiết điểm số cho từng idea theo từng criterion.</param>
+    <param name="ranked_ideas" type="array">Ideas đã xếp hạng từ cao xuống thấp.</param>
+  </output>
+
+  <flow>
+    <step n="1" goal="Extract evidence from debate transcript">
+      <action>For each idea in {{ideas}}:
+        Scan through ALL rounds in debate_transcript to collect:
+        1. All mentions of this idea by any agent
+        2. Positive arguments supporting this idea
+        3. Negative arguments/concerns about this idea
+        4. Agent stances (support/oppose/neutral)
+        5. Specific evidence or data points mentioned
+      </action>
+
+      <action>Store evidence map:
+        ```yaml
+        evidence_map:
+          idea_1:
+            supporting_arguments:
+              - agent: "AgentName"
+                round: 1
+                argument: "Full text of supporting argument"
+                criterion_relevance: ["SEO Performance", "Engagement"]
+            opposing_arguments:
+              - agent: "AgentName"
+                round: 2
+                argument: "Concern raised"
+                criterion_relevance: ["Strategic Alignment"]
+            agent_stances:
+              - agent: "ContentAnalyzer"
+                stance: "strongly_support"
+                confidence: "high"
+              - agent: "SEOSpecialist"
+                stance: "support"
+                confidence: "medium"
+          idea_2:
+            ...
+        ```
+      </action>
+    </step>
+
+    <step n="2" goal="Score each idea on each criterion">
+      <action>Initialize detailed_scores array: []</action>
+
+      <action>For each idea:
+        For each criterion in {{criteria}}:
+
+          1. Identify relevant arguments for this criterion:
+             - Filter evidence_map by criterion_relevance
+             - Extract supporting vs opposing points
+
+          2. Analyze agent consensus:
+             - How many agents supported on this criterion?
+             - Any strong objections?
+             - Quality of supporting arguments
+
+          3. Assign score (0-10 scale):
+             - 9-10: Strong support from all/most agents, solid evidence
+             - 7-8: Good support, minor concerns addressed
+             - 5-6: Mixed opinions, some valid concerns
+             - 3-4: More concerns than support
+             - 0-2: Weak or opposed by most agents
+
+          4. Write detailed rationale:
+             ```yaml
+             - idea_id: "idea_1"
+               idea_title: "Title of idea"
+               criterion: "SEO Performance"
+               score: 8.5
+               max_score: 10.0
+               rationale: |
+                 Score based on following evidence:
+                 - SEOSpecialist (Round 1) argued: "strong keyword potential..."
+                 - MarketInsightAgent (Round 2) supported: "high search volume..."
+                 - Minor concern from ContentAnalyzer about keyword density, but addressed in Round 3
+               supporting_evidence:
+                 - agent: "SEOSpecialist"
+                   round: 1
+                   quote: "Key quote from their argument"
+                 - agent: "MarketInsightAgent"
+                   round: 2
+                   quote: "Supporting quote"
+               concerns_addressed:
+                 - concern: "Keyword density issue"
+                   raised_by: "ContentAnalyzer"
+                   addressed_by: "SEOSpecialist"
+                   resolution: "Recommended strategic placement"
+               agent_consensus: "high"  # high/medium/low/split
+             ```
+
+          5. Append to detailed_scores
+      </action>
+    </step>
+
+    <step n="3" goal="Calculate total scores and rank">
+      <action>For each idea:
+        1. Sum scores across all criteria
+        2. Calculate average score
+        3. Determine consensus level:
+           - Count how many agents gave "support" or "strongly_support"
+           - Check for any "oppose" stances
+           - Label consensus: unanimous / high / medium / low / split
+
+        4. Create idea_summary:
+           ```yaml
+           - idea_id: "idea_1"
+             idea_title: "Title"
+             scores_by_criterion:
+               seo_performance: 8.5
+               cultural_resonance: 9.0
+               engagement_potential: 7.5
+               strategic_alignment: 8.0
+             total_score: 33.0
+             average_score: 8.25
+             max_possible: 40.0
+             percentage: 82.5%
+             consensus_level: "high"
+             support_count: 4
+             oppose_count: 0
+             neutral_count: 0
+             key_strengths:
+               - "Strong SEO potential (SEOSpecialist, MarketInsightAgent)"
+               - "Excellent cultural fit (AdaptiveWriter)"
+             key_concerns:
+               - "Timeline might be tight (ContentAnalyzer)"
+             overall_assessment: |
+               Brief overall assessment based on scores and consensus.
+           ```
+      </action>
+
+      <action>Sort ideas by total_score (descending)</action>
+
+      <action>Assign ranks (1, 2, 3...)</action>
+
+      <action>Create ranked_ideas array with rank numbers</action>
+    </step>
+
+    <step n="4" goal="Generate scoring summary">
+      <action>Analyze scoring patterns:
+        - Which criterion had highest variation across ideas?
+        - Which ideas had strongest consensus?
+        - Which ideas were controversial (split opinions)?
+        - Were there any surprises (low-ranked idea had strong scores on specific criterion)?
+      </action>
+
+      <action>Display scoring summary to user:
+        "📊 SCORING COMPLETE 📊"
+        ""
+        "Final Rankings:"
+        For each ranked_idea (top 5):
+          "{{rank}}. {{title}} - {{total_score}}/{{max_possible}} ({{percentage}}%)"
+          "   Consensus: {{consensus_level}}"
+          "   Top Criterion: {{best_criterion}}: {{best_score}}"
+          "   Concern: {{main_concern if any}}"
+        ""
+        "Scoring Insights:"
+        "- {{insight_1}}"
+        "- {{insight_2}}"
+      </action>
+    </step>
+
+    <step n="5" goal="Return results">
+      <output>
+        <param name="detailed_scores" type="array">{{detailed_scores}}</param>
+        <param name="ranked_ideas" type="array">{{ranked_ideas}}</param>
+      </output>
+    </step>
+  </flow>
+
+  <notes>
+    <note>Scoring is evidence-based, not subjective - must reference debate transcript</note>
+    <note>Each score includes rationale with specific agent quotes and round references</note>
+    <note>Scale: 0-10 per criterion, with detailed breakdown</note>
+    <note>Consensus tracking helps identify safe bets vs risky ideas</note>
+    <note>The detailed_scores array makes scoring transparent and auditable</note>
+  </notes>
+</task>
